@@ -26,27 +26,25 @@ int **make_grid(rows,cols)
   return out;
 }
 
-/* make all cells non-living */
-void zero_grid(int **cells, int rows, int cols)
-{
-  int r, c;
-  for (r = 0; r<rows; r++)
-    for (c = 0; c<cols; c++)
-      cells[r][c] = 0;
-}
+
 
 /* read a grid of cells from a text file */
-int **read_grid(FILE *f, int *rows, int *cols) {
+int **read_grid(FILE *f, int *rows, int *cols)
+{
   char buffer[BUFSIZE];
   fgets(buffer, BUFSIZE, f);
 
   while (buffer[0] == '#') fgets(buffer, BUFSIZE, f);
-  
+
   if (sscanf(buffer,"x  =  %d, y  =  %d",cols,rows) == 2) {
     int **grid  =  make_grid(*rows, *cols);
     int r = 0;
-    zero_grid(grid, *rows, *cols);
-    
+
+    // zero the grid, i.e., make all cells non-living
+    for (int row = 0; row < *rows; row++)
+      for (int col = 0; col < *cols; cols++)
+        grid[row][col] = 0 ;
+
     while (! feof(f) && r<(*rows)) {
       int c;
       fgets(buffer, BUFSIZE, f);
@@ -118,23 +116,32 @@ void next(int **cells, int rows, int cols) {
 }
 
 /* read an image and generate a result */
-int main(int argc, char **argv) {
-  int rows = 0; int cols = 0; int iterations = 0; int i;
+int main(int argc, char **argv)
+{
+  int rows = 0;
+  int cols = 0;
+  int iterations = 0;
+  int i;
+
   if (argc<2 || !(grid = read_grid(stdin,&rows,&cols))
       || (iterations = atoi(argv[1]))<0) {
     fprintf(stderr,"life usage:  life iterations <inputfile\n");
     exit(1);
   }
+
 #ifdef DEBUG
   printf("input:\n"); print_grid(stdout,grid,rows,cols);
 #endif /* DEBUG */
+
   neighbors  =  make_grid(rows,cols);
   for (i = 0; i<iterations; i++) {
     next(grid, rows, cols);
+
 #ifdef DEBUG
     printf("next\n"); print_grid(stdout,grid,rows,cols);
 #endif /* DEBUG */
   }
+
   print_grid(stdout,grid,rows,cols); free_grid(grid,rows);
   free_grid(neighbors,rows);
 }
