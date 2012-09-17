@@ -2,7 +2,7 @@
 CFLAGS = -std=gnu99 -D _GNU_SOURCE -ggdb
 CC = gcc $(CFLAGS)
 
-all: mylife
+all: mylife life
 
 mylife: mylife.o
 	$(CC) mylife.o -o $@
