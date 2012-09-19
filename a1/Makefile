@@ -21,7 +21,7 @@ cheat.o: cheat.c
 	$(CC) cheat.c -o $@
 
 clean:
-	rm -f *.o mylife life
+	rm -f *.o mylife life cheat
 
 
 

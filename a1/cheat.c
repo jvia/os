@@ -4,7 +4,7 @@
 // accounting tick! So you can do a little work and then
 // sleep until *after* the clock has ticked!
 
-#define _POSIX_C_SOURCE 199309
+//#define _POSIX_C_SOURCE 199309
 #include <time.h>
 #include <sys/time.h>
 #include <stdio.h>
@@ -29,9 +29,9 @@ cycle_t cycles_per_tick()
   int i;
   nanosleep(&zero,NULL); // sync with tick
   cycle_t start = get_cycles();
-  for(i=0 ; i<100 ; i++)
+  for(i=0; i<100; i++)
     nanosleep(&zero,NULL);
-  return (get_cycles() - start)/100;
+  return (get_cycles() - start) / 100;
 }
 
 // Actually perform the attack.
@@ -56,5 +56,5 @@ void cheat_attack( double fraction )
 }
 
 int main() {
-  cheat_attack(.5);
+  cheat_attack(.9);
 }

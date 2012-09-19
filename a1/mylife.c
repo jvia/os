@@ -16,6 +16,38 @@
 int **grid;
 int **neighbors;
 struct timespec zero = {0,0};
+typedef long cycle_t;
+
+
+
+
+// a sneaky trick to get the number of elapsed cycles of the high-resolution
+// clock really quickly by dropping into assembler. Much faster than
+// clock_gettime(2) system call.
+inline cycle_t get_cycles()
+{
+  cycle_t ret;
+  asm volatile("rdtsc" : "=A" (ret));
+  return ret;
+}
+
+
+// calculate the cycles of the high resolution clock per accounting clock tick,
+// by waiting through 1000 ticks and dividing.
+cycle_t cycles_per_tick()
+{
+  int i;
+  nanosleep(&zero,NULL); // sync with tick
+  cycle_t start = get_cycles();
+  for(i = 0; i < 100; i++)
+    nanosleep(&zero,NULL);
+  return (get_cycles() - start) / 100;
+}
+
+
+
+
+
 
 /* make a grid of cells for the game of life */
 int **make_grid(rows,cols) {
@@ -90,6 +122,7 @@ int **neighbors = NULL;
 
 void next(int **cells, int rows, int cols) {
   int r, c;
+  
   for (r=0; r<rows; r++) {
     for (c=0; c<cols; c++) {
       int n = 0;
@@ -123,10 +156,6 @@ int main(int argc, char **argv) {
   int iterations=0;
   int i;
 
-  struct timespec sleeptime;
-  sleeptime.tv_sec  = 0;
-  sleeptime.tv_nsec = 0;
-
   if (argc<2 || !(grid=read_grid(stdin,&rows,&cols))
       || (iterations=atoi(argv[1]))<0) {
     fprintf(stderr,"life usage:  life iterations <inputfile\n");
@@ -136,7 +165,6 @@ int main(int argc, char **argv) {
   neighbors = make_grid(rows,cols);
   for (i=0; i<iterations; i++) {
     next(grid, rows, cols);
-    nanosleep(&sleeptime, NULL);
   }
 
   print_grid(stdout,grid,rows,cols); free_grid(grid,rows);
