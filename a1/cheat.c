@@ -56,5 +56,5 @@ void cheat_attack( double fraction )
 }
 
 int main() {
-  cheat_attack(.9);
+  cheat_attack(.5);
 }
