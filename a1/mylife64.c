@@ -16,7 +16,7 @@
 int **grid;
 int **neighbors;
 struct timespec zero = {0,0};
-typedef long cycle_t;
+typedef unsigned long cycle_t;
 
 
 
@@ -32,18 +32,22 @@ inline cycle_t get_cycles()
 }
 
 
-// calculate the cycles of the high resolution clock per accounting clock tick,
-// by waiting through 1000 ticks and dividing.
+// calculate the cycles of the high resolution clock per accounting clock tick, 
+// by waiting through 1000 ticks and dividing. 
 cycle_t cycles_per_tick()
 {
-  int i;
-  nanosleep(&zero,NULL); // sync with tick
-  cycle_t start = get_cycles();
-  for(i = 0; i < 100; i++)
-    nanosleep(&zero,NULL);
-  return (get_cycles() - start) / 100;
+    int i; 
+    cycle_t start, finish, elapsed; 
+    const cycle_t hundred = 100;// number of trials to measure
+    nanosleep(&zero,NULL); 	// sync with tick
+    start = get_cycles();	// read start of accounting cycle
+    for(i=0 ; i<hundred ; i++)
+      nanosleep(&zero,NULL);
+    finish = get_cycles(); 	// read the end time for 100 accounting cycles
+    elapsed = finish - start; 	// elapsed time, but it's unsigned long long!
+    elapsed &= 0xffffffff;  	// zero upper word of long long if a clock wrap
+    return elapsed/hundred; 	// keep result unsigned long
 }
-
 
 
 /* make a grid of cells for the game of life */
@@ -148,9 +152,9 @@ void next(int **cells, int rows, int cols) {
 
 /* read an image and generate a result */
 int main(int argc, char **argv) {
-  int rows=0;
-  int cols=0;
-  int iterations=0;
+  int rows = 0;
+  int cols = 0;
+  int iterations = 0;
   int i;
   cycle_t work, tick_start, now;
   double fraction = 0.75;
@@ -166,6 +170,7 @@ int main(int argc, char **argv) {
   work = fraction * cycles_per_tick();
   nanosleep(&zero, NULL);                // synchronize with next tick.
   tick_start = get_cycles();            // start relative time measurement
+
   neighbors = make_grid(rows, cols);
   for (i = 0; i < iterations; i++) {
     now = get_cycles();
