@@ -46,9 +46,6 @@ cycle_t cycles_per_tick()
 
 
 
-
-
-
 /* make a grid of cells for the game of life */
 int **make_grid(rows,cols) {
   int **out = (int **)malloc (rows*sizeof (int *));
@@ -155,6 +152,9 @@ int main(int argc, char **argv) {
   int cols=0;
   int iterations=0;
   int i;
+  cycle_t work, tick_start, now;
+  double fraction = 0.75;
+
 
   if (argc<2 || !(grid=read_grid(stdin,&rows,&cols))
       || (iterations=atoi(argv[1]))<0) {
@@ -162,8 +162,18 @@ int main(int argc, char **argv) {
     exit(1);
   }
 
-  neighbors = make_grid(rows,cols);
-  for (i=0; i<iterations; i++) {
+
+  work = fraction * cycles_per_tick();
+  nanosleep(&zero, NULL);                // synchronize with next tick.
+  tick_start = get_cycles();            // start relative time measurement
+  neighbors = make_grid(rows, cols);
+  for (i = 0; i < iterations; i++) {
+    now = get_cycles();
+    if (now - tick_start >= work) {
+      nanosleep(&zero, NULL);
+      tick_start = get_cycles();
+    }
+    
     next(grid, rows, cols);
   }
 
