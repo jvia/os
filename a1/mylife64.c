@@ -157,7 +157,7 @@ int main(int argc, char **argv) {
   int iterations = 0;
   int i;
   cycle_t work, tick_start, now;
-  double fraction = 0.75;
+  double fraction = 0.5;
 
 
   if (argc<2 || !(grid=read_grid(stdin,&rows,&cols))
