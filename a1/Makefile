@@ -2,26 +2,16 @@
 #CFLAGS = -std=gnu99 -D _GNU_SOURCE -ggdb
 CC = gcc $(CFLAGS)
 
-all: mylife life
-
-mylife: mylife.o
-	$(CC) mylife.o -o $@
-mylife.o: mylife.c
-	$(CC) -c $< -o $@
-
-
-life: life.o
-	$(CC) mylife.o -o $@
-life.o: life.c
-	$(CC) life.c -o $@
-
-cheat: cheat.o
-	$(CC) cheat.o -o $@
-cheat.o: cheat.c
-	$(CC) cheat.c -o $@
+all: 
+	$(CC) -g cheat.c      -o cheat
+	$(CC) -g cheat-ia64.c -o cheat64
+	$(CC) -g life.c       -o life
+	$(CC) -g mylife.c     -o mylife
+	$(CC) -g mylife64.c   -o mylife64
+	$(CC) -g sig_life.c   -o sig_life
 
 clean:
-	rm -f *.o mylife life cheat
+	rm -f *.o cheat cheat64 life mylife mylife64 sig_life
 
 
 
