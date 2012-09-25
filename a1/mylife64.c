@@ -149,7 +149,7 @@ int** read_grid(FILE* f, int* rows, int* cols) {
       int c;
       fgets(buffer, BUFSIZE, f);
       for (c = 0; c < BUFSIZE && c < (*cols) &&
-             buffer[qc] != '\n' && buffer[c] != '\0'; ++c) {
+             buffer[c] != '\n' && buffer[c] != '\0'; ++c) {
         if (buffer[c]=='.' || buffer[c]==' ')
           grid[r][c]=0;
         else
