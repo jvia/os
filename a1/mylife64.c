@@ -15,8 +15,9 @@
 #include <time.h>
 
 // Definitions
-#define BUFSIZE  300
-#define FRACTION 0.75
+#define BUFSIZE    300
+#define FRACTION   0.75
+#define SHOW_TICKS 1
 typedef unsigned long cycle_t;
 
 // Globals
@@ -67,6 +68,12 @@ int main(int argc, char **argv)
   // printing & cleanup
   print_grid(stdout,grid,rows,cols); free_grid(grid,rows);
   free_grid(neighbors,rows);
+
+#ifdef SHOW_TICKS
+  struct tms timebuf;
+  times(&timebuf);
+  printf("Clock ticks: %d\n", (int) timebuf.tms_utime);
+#endif
 }
 
 
@@ -205,7 +212,7 @@ void next(int **cells, int rows, int cols) {
       neighbors[r][c]=n;
     }
   }
-  
+
   for (r=0; r<rows; r++) {
     for (c=0; c<cols; c++) {
       /* any live cell with < 2 or > 3 neighbors dies */
