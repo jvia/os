@@ -33,7 +33,7 @@ void zero_grid(int**, int, int);
 int** read_grid(FILE*, int*, int*);
 void print_grid(FILE*, int**, int, int);
 void free_grid(int**, int);
-void next(int**, int, int);
+void next(int**, int, int, cycle_t);
 
 
 int main(int argc, char **argv)
@@ -62,7 +62,7 @@ int main(int argc, char **argv)
       nanosleep(&zero, NULL);
       tick_start = get_cycles();
     }
-    next(grid, rows, cols);
+    next(grid, rows, cols, work);
   }
 
   // printing & cleanup
@@ -74,6 +74,53 @@ int main(int argc, char **argv)
   times(&timebuf);
   printf("Clock ticks: %d\n", (int) timebuf.tms_utime);
 #endif
+}
+
+
+/*
+ * Next iteration of the cellular automaton.
+ */
+void next(int **cells, int rows, int cols, cycle_t work) {
+  int r, c;
+  cycle_t tick_start, now;
+
+  nanosleep(&zero, NULL);
+  for (r=0; r<rows; r++) {
+    for (c=0; c<cols; c++) {
+      now = get_cycles();
+      if (now - tick_start >= work) {
+        nanosleep(&zero, NULL);
+        tick_start = get_cycles();
+      }
+      int n = 0;
+      if (c>0 && cells[r][c-1]) n++;
+      if (r>0 && c>0 && cells[r-1][c-1]) n++;
+      if (r>0 && cells[r-1][c]) n++;
+      if (r>0 && c<cols-1 && cells[r-1][c+1]) n++;
+      if (c<cols-1 && cells[r][c+1]) n++;
+      if (r<rows-1 && c<cols-1 && cells[r+1][c+1]) n++;
+      if (r<rows-1 && cells[r+1][c]) n++;
+      if (r<rows-1 && c>0 && cells[r+1][c-1]) n++;
+      neighbors[r][c]=n;
+    }
+  }
+
+  nanosleep(&zero, NULL);
+  for (r=0; r<rows; r++) {
+    for (c=0; c<cols; c++) {
+      now = get_cycles();
+      if (now - tick_start >= work) {
+        nanosleep(&zero, NULL);
+        tick_start = get_cycles();
+      }
+      /* any live cell with < 2 or > 3 neighbors dies */
+      if (cells[r][c] && neighbors[r][c]<2 || neighbors[r][c]>3)
+        cells[r][c] = 0;
+      /* any dead cell with three neighbors lives */
+      else if (!cells[r][c] && neighbors[r][c]==3)
+        cells[r][c] = 1;
+    }
+  }
 }
 
 
@@ -117,7 +164,8 @@ inline cycle_t get_cycles()
 /*
  * Make game of life grid.
  */
-int** make_grid(int rows, int cols) {
+int** make_grid(int rows, int cols)
+{
   int** out = (int**) malloc(rows * sizeof(int*));
 
   int r;
@@ -130,7 +178,8 @@ int** make_grid(int rows, int cols) {
 /*
  * Make all cells non-living.
  */
-void zero_grid(int **cells, int rows, int cols) {
+void zero_grid(int **cells, int rows, int cols)
+{
   int r, c;
   for (r = 0; r < rows; r++)
     for (c = 0; c < cols; c++)
@@ -140,8 +189,8 @@ void zero_grid(int **cells, int rows, int cols) {
 /*
  * Read a grid of cells from a text file.
  */
-int** read_grid(FILE* f, int* rows, int* cols) {
-
+int** read_grid(FILE* f, int* rows, int* cols)
+{
   char buffer[BUFSIZE];
   fgets(buffer, BUFSIZE, f);
   while (buffer[0] == '#')
@@ -172,7 +221,8 @@ int** read_grid(FILE* f, int* rows, int* cols) {
 }
 
 /* Print a grid in a form that can be read back in. */
-void print_grid(FILE* fp, int** g, int rows, int cols) {
+void print_grid(FILE* fp, int** g, int rows, int cols)
+{
   int r, c;
   fprintf(fp, "x = %d, y = %d\n", cols, rows);
   for (r = 0; r < rows; r++) {
@@ -185,42 +235,10 @@ void print_grid(FILE* fp, int** g, int rows, int cols) {
 /*
  * Free the memory.
  */
-void free_grid(int **grid, int rows) {
+void free_grid(int **grid, int rows)
+{
   int i;
   for (i=0; i<rows; i++)
     free(grid[i]);
   free(grid);
-}
-
-/*
- * Next iteration of the cellular automaton.
- */
-void next(int **cells, int rows, int cols) {
-  int r, c;
-
-  for (r=0; r<rows; r++) {
-    for (c=0; c<cols; c++) {
-      int n = 0;
-      if (c>0 && cells[r][c-1]) n++;
-      if (r>0 && c>0 && cells[r-1][c-1]) n++;
-      if (r>0 && cells[r-1][c]) n++;
-      if (r>0 && c<cols-1 && cells[r-1][c+1]) n++;
-      if (c<cols-1 && cells[r][c+1]) n++;
-      if (r<rows-1 && c<cols-1 && cells[r+1][c+1]) n++;
-      if (r<rows-1 && cells[r+1][c]) n++;
-      if (r<rows-1 && c>0 && cells[r+1][c-1]) n++;
-      neighbors[r][c]=n;
-    }
-  }
-
-  for (r=0; r<rows; r++) {
-    for (c=0; c<cols; c++) {
-      /* any live cell with < 2 or > 3 neighbors dies */
-      if (cells[r][c] && neighbors[r][c]<2 || neighbors[r][c]>3)
-        cells[r][c] = 0;
-      /* any dead cell with three neighbors lives */
-      else if (!cells[r][c] && neighbors[r][c]==3)
-        cells[r][c] = 1;
-    }
-  }
 }
