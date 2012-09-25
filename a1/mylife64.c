@@ -2,6 +2,9 @@
   Assignment 01 -- Cheating the OS
   Jeremiah Via <jeremiah@cs.tufts.edu>
   2012-09-25
+
+  Exploit based off of the paper "Secretly Monopolizing the CPU
+  Without Superuser Privileges" by Dan Tsafrir, et al.
 */
 #include <stdio.h>
 #include <string.h>
@@ -146,7 +149,7 @@ int** read_grid(FILE* f, int* rows, int* cols) {
       int c;
       fgets(buffer, BUFSIZE, f);
       for (c = 0; c < BUFSIZE && c < (*cols) &&
-             buffer[c] != '\n' && buffer[c] != '\0'; ++c) {
+             buffer[qc] != '\n' && buffer[c] != '\0'; ++c) {
         if (buffer[c]=='.' || buffer[c]==' ')
           grid[r][c]=0;
         else
