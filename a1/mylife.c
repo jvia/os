@@ -3,7 +3,7 @@
 #include <malloc.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include <sys/time.h>
+#include <sys/times.h>
 #include <time.h>
 
 #define TRUE 1
@@ -17,8 +17,6 @@ int **grid;
 int **neighbors;
 struct timespec zero = {0,0};
 typedef long cycle_t;
-
-
 
 
 // a sneaky trick to get the number of elapsed cycles of the high-resolution
@@ -156,6 +154,7 @@ int main(int argc, char **argv) {
   double fraction = 0.75;
 
 
+
   if (argc<2 || !(grid=read_grid(stdin,&rows,&cols))
       || (iterations=atoi(argv[1]))<0) {
     fprintf(stderr,"life usage:  life iterations <inputfile\n");
@@ -179,4 +178,8 @@ int main(int argc, char **argv) {
 
   print_grid(stdout,grid,rows,cols); free_grid(grid,rows);
   free_grid(neighbors,rows);
+
+  struct tms timebuf;
+  times(&timebuf);
+  printf("Clock ticks: %d\n", (int) timebuf.tms_utime);
 }
