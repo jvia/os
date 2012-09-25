@@ -1,25 +1,91 @@
+/*
+  Assignment 01 -- Cheating the OS
+  Jeremiah Via <jeremiah@cs.tufts.edu>
+  2012-09-25
+*/ 
 #include <stdio.h>
 #include <string.h>
 #include <malloc.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include <sys/time.h>
+#include <sys/times.h>
 #include <time.h>
 
-#define TRUE 1
-#define FALSE 0
-#define BUFSIZE 300
-
-// #define DEBUG 1
-
-/* global variables contain grid data */
-int **grid;
-int **neighbors;
-struct timespec zero = {0,0};
+#define BUFSIZE  300
+#define FRACTION 0.75
 typedef unsigned long cycle_t;
 
 
+// global variables contain grid data 
+int **grid = NULL;
+int **neighbors = NULL;
+struct timespec zero = {0,0};
 
+// Function prototypes
+cycle_t cycles_per_tick();
+inline cycle_t get_cycles();
+
+int** make_grid(int, int);
+void zero_grid(int**, int, int);
+int** read_grid(FILE*, int*, int*);
+void print_grid(FILE*, int**, int, int);
+void free_grid(int**, int);
+void next(int**, int, int);
+
+
+int main(int argc, char **argv)
+{
+  // startup & error checking
+  int rows = 0, cols = 0, iterations = 0;
+  if (argc < 2 ||
+      !(grid = read_grid(stdin, &rows, &cols)) ||
+      (iterations = atoi(argv[1])) < 0) {
+    fprintf(stderr,"life usage: life iterations < inputfile\n");
+    exit(1);
+  }
+
+  // calculate how long to run between sleeps & synchronize
+  cycle_t work, tick_start, now;
+  work = FRACTION * cycles_per_tick();
+  nanosleep(&zero, NULL);
+  tick_start = get_cycles();
+  
+  int i;
+  neighbors = make_grid(rows, cols);
+  for (i = 0; i < iterations; i++) {
+    now = get_cycles();
+    if (now - tick_start >= work) {
+      nanosleep(&zero, NULL);
+      tick_start = get_cycles();
+    }
+
+    next(grid, rows, cols);
+  }
+
+  print_grid(stdout,grid,rows,cols); free_grid(grid,rows);
+  free_grid(neighbors,rows);
+
+  struct tms timebuf;
+  times(&timebuf);
+  printf("Clock ticks: %d\n", (int) timebuf.tms_utime);
+}
+
+// calculate the cycles of the high resolution clock per accounting clock tick,
+// by waiting through 1000 ticks and dividing.
+cycle_t cycles_per_tick()
+{
+  int i;
+  cycle_t start, finish, elapsed;
+  const cycle_t hundred = 100;// number of trials to measure
+  nanosleep(&zero,NULL);        // sync with tick
+  start = get_cycles(); // read start of accounting cycle
+  for(i=0 ; i<hundred ; i++)
+    nanosleep(&zero,NULL);
+  finish = get_cycles();        // read the end time for 100 accounting cycles
+  elapsed = finish - start;     // elapsed time, but it's unsigned long long!
+  elapsed &= 0xffffffff;        // zero upper word of long long if a clock wrap
+  return elapsed/hundred;       // keep result unsigned long
+}
 
 // a sneaky trick to get the number of elapsed cycles of the high-resolution
 // clock really quickly by dropping into assembler. Much faster than
@@ -32,26 +98,10 @@ inline cycle_t get_cycles()
 }
 
 
-// calculate the cycles of the high resolution clock per accounting clock tick, 
-// by waiting through 1000 ticks and dividing. 
-cycle_t cycles_per_tick()
-{
-    int i; 
-    cycle_t start, finish, elapsed; 
-    const cycle_t hundred = 100;// number of trials to measure
-    nanosleep(&zero,NULL); 	// sync with tick
-    start = get_cycles();	// read start of accounting cycle
-    for(i=0 ; i<hundred ; i++)
-      nanosleep(&zero,NULL);
-    finish = get_cycles(); 	// read the end time for 100 accounting cycles
-    elapsed = finish - start; 	// elapsed time, but it's unsigned long long!
-    elapsed &= 0xffffffff;  	// zero upper word of long long if a clock wrap
-    return elapsed/hundred; 	// keep result unsigned long
-}
 
 
 /* make a grid of cells for the game of life */
-int **make_grid(rows,cols) {
+int **make_grid(int rows, int cols) {
   int **out = (int **)malloc (rows*sizeof (int *));
   int r;
   for (r=0; r<rows; r++) {
@@ -118,12 +168,9 @@ void free_grid(int **grid, int rows) {
   free(grid);
 }
 
-int **grid = NULL;
-int **neighbors = NULL;
-
 void next(int **cells, int rows, int cols) {
   int r, c;
-  
+
   for (r=0; r<rows; r++) {
     for (c=0; c<cols; c++) {
       int n = 0;
@@ -142,46 +189,10 @@ void next(int **cells, int rows, int cols) {
     for (c=0; c<cols; c++) {
       /* any live cell with < 2 or > 3 neighbors dies */
       if (cells[r][c] && neighbors[r][c]<2 || neighbors[r][c]>3)
-        cells[r][c] = FALSE;
+        cells[r][c] = 0;
       /* any dead cell with three neighbors lives */
       else if (!cells[r][c] && neighbors[r][c]==3)
-        cells[r][c] = TRUE;
+        cells[r][c] = 1;
     }
   }
-}
-
-/* read an image and generate a result */
-int main(int argc, char **argv) {
-  int rows = 0;
-  int cols = 0;
-  int iterations = 0;
-  int i;
-  cycle_t work, tick_start, now;
-  double fraction = 0.5;
-
-
-  if (argc<2 || !(grid=read_grid(stdin,&rows,&cols))
-      || (iterations=atoi(argv[1]))<0) {
-    fprintf(stderr,"life usage:  life iterations <inputfile\n");
-    exit(1);
-  }
-
-
-  work = fraction * cycles_per_tick();
-  nanosleep(&zero, NULL);                // synchronize with next tick.
-  tick_start = get_cycles();            // start relative time measurement
-
-  neighbors = make_grid(rows, cols);
-  for (i = 0; i < iterations; i++) {
-    now = get_cycles();
-    if (now - tick_start >= work) {
-      nanosleep(&zero, NULL);
-      tick_start = get_cycles();
-    }
-    
-    next(grid, rows, cols);
-  }
-
-  print_grid(stdout,grid,rows,cols); free_grid(grid,rows);
-  free_grid(neighbors,rows);
 }
