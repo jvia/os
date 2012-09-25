@@ -16,7 +16,7 @@
 
 // Definitions
 #define BUFSIZE    300
-#define FRACTION   0.75
+#define FRACTION   0.9
 #define SHOW_TICKS 1
 typedef unsigned long cycle_t;
 
