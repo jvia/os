@@ -2,7 +2,7 @@
   Assignment 01 -- Cheating the OS
   Jeremiah Via <jeremiah@cs.tufts.edu>
   2012-09-25
-*/ 
+*/
 #include <stdio.h>
 #include <string.h>
 #include <malloc.h>
@@ -11,12 +11,12 @@
 #include <sys/times.h>
 #include <time.h>
 
+// Definitions
 #define BUFSIZE  300
 #define FRACTION 0.75
 typedef unsigned long cycle_t;
 
-
-// global variables contain grid data 
+// Globals
 int **grid = NULL;
 int **neighbors = NULL;
 struct timespec zero = {0,0};
@@ -24,7 +24,6 @@ struct timespec zero = {0,0};
 // Function prototypes
 cycle_t cycles_per_tick();
 inline cycle_t get_cycles();
-
 int** make_grid(int, int);
 void zero_grid(int**, int, int);
 int** read_grid(FILE*, int*, int*);
@@ -49,7 +48,8 @@ int main(int argc, char **argv)
   work = FRACTION * cycles_per_tick();
   nanosleep(&zero, NULL);
   tick_start = get_cycles();
-  
+
+  // main loop with exploit
   int i;
   neighbors = make_grid(rows, cols);
   for (i = 0; i < iterations; i++) {
@@ -58,38 +58,44 @@ int main(int argc, char **argv)
       nanosleep(&zero, NULL);
       tick_start = get_cycles();
     }
-
     next(grid, rows, cols);
   }
 
+  // printing & cleanup
   print_grid(stdout,grid,rows,cols); free_grid(grid,rows);
   free_grid(neighbors,rows);
-
-  struct tms timebuf;
-  times(&timebuf);
-  printf("Clock ticks: %d\n", (int) timebuf.tms_utime);
 }
 
-// calculate the cycles of the high resolution clock per accounting clock tick,
-// by waiting through 1000 ticks and dividing.
+
+/*
+ * Calculate the number of cycles per tick using the high resolution
+ * clock.
+ */
 cycle_t cycles_per_tick()
 {
   int i;
   cycle_t start, finish, elapsed;
-  const cycle_t hundred = 100;// number of trials to measure
-  nanosleep(&zero,NULL);        // sync with tick
-  start = get_cycles(); // read start of accounting cycle
+  const cycle_t hundred = 100;// number of trials
+
+  // sync with accounting tick, then record cycles
+  nanosleep(&zero,NULL);
+  start = get_cycles();
+
+  // sleep through 100 account ticks
   for(i=0 ; i<hundred ; i++)
     nanosleep(&zero,NULL);
-  finish = get_cycles();        // read the end time for 100 accounting cycles
-  elapsed = finish - start;     // elapsed time, but it's unsigned long long!
-  elapsed &= 0xffffffff;        // zero upper word of long long if a clock wrap
-  return elapsed/hundred;       // keep result unsigned long
+
+  // record time & record the average number of cycls
+  finish = get_cycles();
+  elapsed = finish - start;
+  elapsed &= 0xffffffff;
+  return elapsed / hundred;
 }
 
-// a sneaky trick to get the number of elapsed cycles of the high-resolution
-// clock really quickly by dropping into assembler. Much faster than
-// clock_gettime(2) system call.
+
+/*
+ * Get number of elapsed cycles, using assembler for speed.
+ */
 inline cycle_t get_cycles()
 {
   cycle_t ret;
@@ -98,47 +104,53 @@ inline cycle_t get_cycles()
 }
 
 
+/*
+ * Make game of life grid.
+ */
+int** make_grid(int rows, int cols) {
+  int** out = (int**) malloc(rows * sizeof(int*));
 
-
-/* make a grid of cells for the game of life */
-int **make_grid(int rows, int cols) {
-  int **out = (int **)malloc (rows*sizeof (int *));
   int r;
-  for (r=0; r<rows; r++) {
+  for (r = 0; r < rows; r++)
     out[r] = (int *)malloc (cols * sizeof(int));
-    // if (!out[r]) fprintf(stderr,"allocation of row %d failed\n",r);
-  }
 
   return out;
 }
 
-/* make all cells non-living */
+/*
+ * Make all cells non-living.
+ */
 void zero_grid(int **cells, int rows, int cols) {
   int r, c;
-  for (r=0; r<rows; r++)
-    for (c=0; c<cols; c++)
+  for (r = 0; r < rows; r++)
+    for (c = 0; c < cols; c++)
       cells[r][c]=0;
 }
 
-/* read a grid of cells from a text file */
-int **read_grid(FILE *f, int *rows, int *cols) {
+/*
+ * Read a grid of cells from a text file.
+ */
+int** read_grid(FILE* f, int* rows, int* cols) {
+
   char buffer[BUFSIZE];
   fgets(buffer, BUFSIZE, f);
-  while (buffer[0]=='#') fgets(buffer, BUFSIZE, f);
-  if (sscanf(buffer,"x = %d, y = %d",cols,rows)==2) {
-    int **grid = make_grid(*rows, *cols);
+  while (buffer[0] == '#')
+    fgets(buffer, BUFSIZE, f);
+
+  if (sscanf(buffer, "x = %d, y = %d", cols, rows) == 2) {
+    int** grid = make_grid(*rows, *cols);
     int r=0;
     zero_grid(grid, *rows, *cols);
-    while (! feof(f) && r<(*rows)) {
+
+    while (!feof(f) && r < (*rows)) {
       int c;
       fgets(buffer, BUFSIZE, f);
-      for (c=0; c<BUFSIZE && c<(*cols)
-             && buffer[c] != '\n' && buffer[c] != '\0'; ++c) {
-        if (buffer[c]=='.' || buffer[c]==' ') {
+      for (c = 0; c < BUFSIZE && c < (*cols) &&
+             buffer[c] != '\n' && buffer[c] != '\0'; ++c) {
+        if (buffer[c]=='.' || buffer[c]==' ')
           grid[r][c]=0;
-        } else {
+        else
           grid[r][c]=1;
-        }
       }
       ++r;
     }
@@ -149,18 +161,20 @@ int **read_grid(FILE *f, int *rows, int *cols) {
   }
 }
 
-/* print a grid in a form that can be read back in */
-void print_grid(FILE *fp, int **g,int rows,int cols) {
+/* Print a grid in a form that can be read back in. */
+void print_grid(FILE* fp, int** g, int rows, int cols) {
   int r, c;
   fprintf(fp, "x = %d, y = %d\n", cols, rows);
-  for (r=0; r<rows; r++) {
-    for (c=0; c<cols; c++) {
-      fprintf(fp,(g[r][c]?"*":"."));
-    }
+  for (r = 0; r < rows; r++) {
+    for (c = 0; c < cols; c++)
+      fprintf(fp, (g[r][c] ? "*" : "."));
     fprintf(fp,"\n");
   }
 }
 
+/*
+ * Free the memory.
+ */
 void free_grid(int **grid, int rows) {
   int i;
   for (i=0; i<rows; i++)
@@ -168,6 +182,9 @@ void free_grid(int **grid, int rows) {
   free(grid);
 }
 
+/*
+ * Next iteration of the cellular automaton.
+ */
 void next(int **cells, int rows, int cols) {
   int r, c;
 
@@ -185,6 +202,7 @@ void next(int **cells, int rows, int cols) {
       neighbors[r][c]=n;
     }
   }
+  
   for (r=0; r<rows; r++) {
     for (c=0; c<cols; c++) {
       /* any live cell with < 2 or > 3 neighbors dies */
