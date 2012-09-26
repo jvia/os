@@ -33,7 +33,7 @@ void zero_grid(int**, int, int);
 int** read_grid(FILE*, int*, int*);
 void print_grid(FILE*, int**, int, int);
 void free_grid(int**, int);
-void next(int**, int, int, cycle_t);
+void next(int**, int, int);
 
 
 int main(int argc, char **argv)
@@ -62,7 +62,7 @@ int main(int argc, char **argv)
       nanosleep(&zero, NULL);
       tick_start = get_cycles();
     }
-    next(grid, rows, cols, work);
+    next(grid, rows, cols);
   }
 
   // printing & cleanup
@@ -80,17 +80,10 @@ int main(int argc, char **argv)
 /*
  * Next iteration of the cellular automaton.
  */
-void next(int **cells, int rows, int cols, cycle_t work) {
+void next(int **cells, int rows, int cols) {
   int r, c;
-  cycle_t tick_start, now;
 
-  nanosleep(&zero, NULL);
   for (r=0; r<rows; r++) {
-    now = get_cycles();
-    if (now - tick_start >= work) {
-      nanosleep(&zero, NULL);
-      tick_start = get_cycles();
-    }
     for (c=0; c<cols; c++) {
       int n = 0;
       if (c>0 && cells[r][c-1]) n++;
@@ -105,13 +98,7 @@ void next(int **cells, int rows, int cols, cycle_t work) {
     }
   }
 
-  nanosleep(&zero, NULL);
   for (r=0; r<rows; r++) {
-    now = get_cycles();
-    if (now - tick_start >= work) {
-      nanosleep(&zero, NULL);
-      tick_start = get_cycles();
-    }
     for (c=0; c<cols; c++) {
       /* any live cell with < 2 or > 3 neighbors dies */
       if (cells[r][c] && neighbors[r][c]<2 || neighbors[r][c]>3)
