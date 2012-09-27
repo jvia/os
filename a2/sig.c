@@ -7,9 +7,12 @@
 #include <stdlib.h>
 #include <signal.h>
 #include <sys/time.h>
+#include <sys/times.h>
 #include <sys/resource.h>
 
 void signal_handler(int);
+clock_t program_time();
+double ptime(void);
 
 int main(int argc, char** argv)
 {
@@ -37,7 +40,7 @@ int main(int argc, char** argv)
 void signal_handler(int status)
 {
   static int count = 0;
-  static struct rusage usage;
+
 
   switch (status) {
   case SIGALRM:
@@ -45,15 +48,29 @@ void signal_handler(int status)
     count+=10;
     break;
   case SIGINT:
-    getrusage(RUSAGE_SELF, &usage);
-    double time = usage.ru_utime.tv_sec + usage.ru_stime.tv_sec;
-    time += (usage.ru_utime.tv_usec / 1000.0) + (usage.ru_stime.tv_usec / 1000.0);
-    printf("Program time: %f\n", time);
+    printf("Program time: %f\n", ptime());
     break;
-  case SIGTERM:
   case SIGTSTP:
+  case SIGTERM:
+    printf("Program time: %f\n", ptime());
   default:
-    fprintf(stdout, "\nCODE: %d\n", status);
     exit(0);
   }
+}
+
+double ptime()
+{
+  static struct rusage usage;
+  getrusage(RUSAGE_SELF, &usage);
+  double time = usage.ru_utime.tv_sec + usage.ru_stime.tv_sec;
+  time += (usage.ru_utime.tv_usec / 1000.0) + (usage.ru_stime.tv_usec / 1000.0);
+  return time;
+}
+
+
+clock_t program_time()
+{
+  struct tms timebuf;
+  times(&timebuf);
+  return timebuf.tms_utime + timebuf.tms_stime;
 }
