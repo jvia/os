@@ -61,6 +61,8 @@ int main(void)
     if ((linelen = getline(&line, &linecap, stdin)) > 0) {
       pthread_mutex_lock(&buffer_lock);
       line[linelen-1] = '\0';
+      if (back < frnt)
+        free(buffer[back]);
       buffer[back] = line;
       back = (back + 1) % BUFFER_SIZE;
       if (back == frnt)
@@ -93,6 +95,8 @@ void signal_handler(int status)
     break;
   case SIGTERM:
     printf("Program time: %f\n", ptime());
+    for (; frnt != back; frnt = (frnt + 1) % BUFFER_SIZE)
+      free(buffer[frnt]);
     exit(0);
   }
 }
