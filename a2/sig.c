@@ -14,15 +14,19 @@
 // Function prototypes
 void signal_handler(int);
 clock_t program_time();
-double ptime(void);
+double ptime();
 void add_line(const char*);
-void get_lines(char*);
+void print_lines();
 
 // Globals
-char** buffer;
+#define BUFFER_SIZE 10
+char* buffer[10];
+int frnt = 0, back = 0; // frnt is older than back
+int hist = 0;
 pthread_mutex_t buffer_lock;
 
-int main(int argc, char** argv)
+
+int main(void)
 {
   // Setup mutex
   pthread_mutex_init(&buffer_lock, NULL);
@@ -44,36 +48,33 @@ int main(int argc, char** argv)
   timer.it_value.tv_usec = 0;
   setitimer(ITIMER_REAL, &timer, NULL);
 
-  // wait: http://www.gnu.org/software/libc/manual/html_node/Sigsuspend.html#Sigsuspend
-  char* line = NULL;
-  size_t linecap = 0;
-  ssize_t linelen;
+  // Capture user input and place into ring buffer
   while(1) {
-    linelen = getline(&line, &linecap, stdin);
-    if (linelen > 0) {
+    char* line = NULL;
+    size_t linecap = 0;
+    ssize_t linelen;
+    if ((linelen = getline(&line, &linecap, stdin)) > 0) {
       pthread_mutex_lock(&buffer_lock);
       line[linelen-1] = '\0';
-      printf("%s\n", line);
+      buffer[back] = line;
+      back = (back + 1) % BUFFER_SIZE;
+      ++hist;
       pthread_mutex_unlock(&buffer_lock);
     }
   }
 }
 
 
-void get_lines(char* lines)
+void print_lines()
 {
-  // probably need to modify signal handler here to termporarily block
-  // the signal to prevent the interrupt and thus a deadlock
-  //struct sigaction cact;
-  //sigaction(SIGTSTP, NULL, &cact);
-  //sig
-  //cact.sa_mask = SIGTSTP;
-  //sigaction(SIGTSTP, &cact, NULL);
   int oldmask = sigsetmask(sigmask(SIGTSTP));
+  int i, h;
   pthread_mutex_lock(&buffer_lock);
-  fprintf(stderr, "Sleeping\n");
-  sleep(10);
-  fprintf(stderr, "Done Sleeping\n");
+  printf("FRONT: %d, BACK: %d, HIST: %d\n", frnt, back, hist);
+  for (i = frnt, h = 1; i != back; i = (i + 1) % BUFFER_SIZE, ++h) {
+    printf("%d: %s\n", h, buffer[i]);
+  }
+
   pthread_mutex_unlock(&buffer_lock);
   sigsetmask(oldmask);
 }
@@ -90,8 +91,7 @@ void signal_handler(int status)
     printf("Program time: %f\n", ptime());
     break;
   case SIGTSTP:
-    printf("IN SIGTSTP\n");
-    get_lines(NULL);
+    print_lines();
     break;
   case SIGTERM:
     printf("Program time: %f\n", ptime());
