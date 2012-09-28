@@ -58,6 +58,8 @@ int main(void)
       line[linelen-1] = '\0';
       buffer[back] = line;
       back = (back + 1) % BUFFER_SIZE;
+      if (back == frnt)
+        frnt = (frnt + 1) % BUFFER_SIZE;
       ++hist;
       pthread_mutex_unlock(&buffer_lock);
     }
@@ -70,11 +72,10 @@ void print_lines()
   int oldmask = sigsetmask(sigmask(SIGTSTP));
   int i, h;
   pthread_mutex_lock(&buffer_lock);
-  printf("FRONT: %d, BACK: %d, HIST: %d\n", frnt, back, hist);
-  for (i = frnt, h = 1; i != back; i = (i + 1) % BUFFER_SIZE, ++h) {
-    printf("%d: %s\n", h, buffer[i]);
+  for (i = frnt, h = hist - BUFFER_SIZE;
+       i != back; i = (i + 1) % BUFFER_SIZE, ++h) {
+    printf("%3d:  %s\n", h, buffer[i]);
   }
-
   pthread_mutex_unlock(&buffer_lock);
   sigsetmask(oldmask);
 }
