@@ -9,18 +9,29 @@
 #include <sys/time.h>
 #include <sys/times.h>
 #include <sys/resource.h>
+#include <pthread.h>
 
+// Function prototypes
 void signal_handler(int);
 clock_t program_time();
 double ptime(void);
+void add_line(const char*);
+void get_lines(char*);
+
+// Globals
+char** buffer;
+pthread_mutex_t buffer_lock;
 
 int main(int argc, char** argv)
 {
+  // Setup mutex
+  pthread_mutex_init(&buffer_lock, NULL);
+
   // setup signal handler
   struct sigaction act;
   act.sa_handler = signal_handler;
   sigaction(SIGALRM, &act, NULL);
-  sigaction(SIGINT, &act, NULL);
+  sigaction(SIGINT,  &act, NULL);
   sigaction(SIGTERM, &act, NULL);
   sigaction(SIGTSTP, &act, NULL);
 
@@ -34,14 +45,42 @@ int main(int argc, char** argv)
   setitimer(ITIMER_REAL, &timer, NULL);
 
   // wait: http://www.gnu.org/software/libc/manual/html_node/Sigsuspend.html#Sigsuspend
-  while(1);
+  char* line = NULL;
+  size_t linecap = 0;
+  ssize_t linelen;
+  while(1) {
+    linelen = getline(&line, &linecap, stdin);
+    if (linelen > 0) {
+      pthread_mutex_lock(&buffer_lock);
+      line[linelen-1] = '\0';
+      printf("%s\n", line);
+      pthread_mutex_unlock(&buffer_lock);
+    }
+  }
+}
+
+
+void get_lines(char* lines)
+{
+  // probably need to modify signal handler here to termporarily block
+  // the signal to prevent the interrupt and thus a deadlock
+  //struct sigaction cact;
+  //sigaction(SIGTSTP, NULL, &cact);
+  //sig
+  //cact.sa_mask = SIGTSTP;
+  //sigaction(SIGTSTP, &cact, NULL);
+  int oldmask = sigsetmask(sigmask(SIGTSTP));
+  pthread_mutex_lock(&buffer_lock);
+  fprintf(stderr, "Sleeping\n");
+  sleep(10);
+  fprintf(stderr, "Done Sleeping\n");
+  pthread_mutex_unlock(&buffer_lock);
+  sigsetmask(oldmask);
 }
 
 void signal_handler(int status)
 {
   static int count = 0;
-
-
   switch (status) {
   case SIGALRM:
     printf("tick %d...\n", count);
@@ -51,9 +90,11 @@ void signal_handler(int status)
     printf("Program time: %f\n", ptime());
     break;
   case SIGTSTP:
+    printf("IN SIGTSTP\n");
+    get_lines(NULL);
+    break;
   case SIGTERM:
     printf("Program time: %f\n", ptime());
-  default:
     exit(0);
   }
 }
