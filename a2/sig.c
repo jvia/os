@@ -22,7 +22,7 @@ void print_lines();
 
 // Globals
 char* buffer[BUFFER_SIZE];
-int frnt = 0, back = 0, hist = 0;
+int frnt = 0, back = 0;
 pthread_mutex_t buffer_lock;
 struct sigaction act;
 
@@ -63,11 +63,8 @@ int main(void)
     // condition. Then add the new input into the ring buffer and
     // adjust indices into the ring buffer. Finally, release lock to
     // others can access it.
-    linelen = getline(&line, &len, stdin);
-    fflush(stdin);
-    if (linelen >= 0) printf("LEN: %d\n",linelen);
-    if (linelen != -1) {
-      fprintf(stderr,"got it\n");
+    if ((linelen = getline(&line, &len, stdin)) != -1) {
+      printf("%s\n", line);
       pthread_mutex_lock(&buffer_lock);
       line[linelen-1] = '\0';
       if (back < frnt)
@@ -76,7 +73,6 @@ int main(void)
       back = (back + 1) % BUFFER_SIZE;
       if (back == frnt)
         frnt = (frnt + 1) % BUFFER_SIZE;
-      ++hist;
       pthread_mutex_unlock(&buffer_lock);
     }
   }
@@ -111,17 +107,15 @@ void signal_handler(int status)
 }
 
 /**
- * Print the contents of the ring buffer along with their history
- * number.
+ * Print the contents of the ring buffer.
  */
 void print_lines()
 {
-  int i, h;
+  int i;
   pthread_mutex_lock(&buffer_lock);
-  for (i = frnt; i != back; i = (i + 1) % BUFFER_SIZE, ++h) {
+  for (i = frnt; i != back; i = (i + 1) % BUFFER_SIZE) {
     printf("  %s\n", buffer[i]);
   }
-  fflush(stdout);
   pthread_mutex_unlock(&buffer_lock);
 }
 
@@ -130,9 +124,8 @@ void print_lines()
  */
 double ptime()
 {
-  static struct rusage usage;
+  struct rusage usage;
   getrusage(RUSAGE_SELF, &usage);
-  double time = usage.ru_utime.tv_sec + usage.ru_stime.tv_sec;
-  time += (usage.ru_utime.tv_usec / 1000.0) + (usage.ru_stime.tv_usec / 1000.0);
-  return time;
+  return usage.ru_utime.tv_sec + (usage.ru_utime.tv_usec / 1000.) + 
+         usage.ru_stime.tv_sec + (usage.ru_stime.tv_usec / 1000.);
 }
