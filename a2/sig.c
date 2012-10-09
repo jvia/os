@@ -33,6 +33,8 @@ int main(void)
 
   // Setup signal handler
   struct sigaction act;
+  sigemptyset(&act.sa_mask);
+  sigaddset(&act.sa_mask, SIGTSTP);
   act.sa_handler = signal_handler;
   sigaction(SIGALRM, &act, NULL);
   sigaction(SIGINT,  &act, NULL);
@@ -107,7 +109,6 @@ void signal_handler(int status)
  */
 void print_lines()
 {
-  int oldmask = sigsetmask(sigmask(SIGTSTP));
   int i, h;
   pthread_mutex_lock(&buffer_lock);
   for (i = frnt, h = hist - BUFFER_SIZE;
@@ -115,7 +116,6 @@ void print_lines()
     printf("%3d:  %s\n", h, buffer[i]);
   }
   pthread_mutex_unlock(&buffer_lock);
-  sigsetmask(oldmask);
 }
 
 /**
