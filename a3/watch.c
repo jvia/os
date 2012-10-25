@@ -85,13 +85,18 @@ void main(int argc, char** argv)
       2.c does this.
     */
     struct rlimit data;
+    data.rlim_cur = 4000000;
+    data.rlim_max = 4000000;
+    prlimit(pid, RLIMIT_DATA, &data, NULL);
 
     /*
       TODO If the child forks more than 20 times, it should be killed
       and the event should be reported. The program 3.c does this.
     */
-
     struct rlimit nproc;
+    nproc.rlim_cur = 20;
+    nproc.rlim_max = 20;
+    prlimit(pid, RLIMIT_NPROC, &nproc, NULL);
 
     /*
       TODO If the child uses more than 1 CPU-second of computer time, it
@@ -99,6 +104,9 @@ void main(int argc, char** argv)
       4.c does this.
     */
     struct rlimit cpu;
+    cpu.rlim_cur = 1;
+    cpu.rlim_max = 1;
+    prlimit(pid, RLIMIT_CPU, &cpu, NULL);
 
     /*
       TODO If the child produces more than 100 lines of output to
@@ -109,41 +117,21 @@ void main(int argc, char** argv)
     */
 
 
-
-
-
-
-
-
-
-
-
-
-
+    // TODO You must forward everything the child prints to stdout, even if you capture it yourself.
 
 
     // WATCH PROCESS
     struct rusage usage;
     int status;
     wait3(&status, 0, &usage);
-
-
-
-    // TODO You must forward everything the child prints to stdout, even if you capture it yourself.
-
-
     print_usage(status, usage);
   } else {
-    char *args[argc-1];
-    for(int i = 0; i < argc; i++)
-      printf(">> %s\n", argv[i]);//args[i] = argv[i];
-
-    if (argc == 2)
-      execl(argv[1], argv[1],  NULL);
-    else
-      execl(argv[1], argv[1], &argv[2], NULL);
-    //execl("/bin/pwd", "/bin/pwd", NULL);
-    //execv(argv[1], argv[1], &argv[2]);
+    // TODO See if this can be made more elegant
+    char* cmd[argc];
+    for (int i = 0; i < argc; i++)
+      cmd[i] = argv[i+1];
+    cmd[argc] = NULL;
+    execvp(cmd[0], cmd);
   }
 
   exit(0);
