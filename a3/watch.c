@@ -19,8 +19,10 @@
 #include <sys/resource.h>
 #include <sys/wait.h>
 #include <time.h>
+#include <pthread.h>
 
 void print_usage(int, struct rusage);
+void output_handler(void*);
 
 /**
    - Some child conditions can be detected via signals. Use them if at
@@ -69,9 +71,9 @@ void main(int argc, char** argv)
 
   //////////////////////////////////////////////////////////////////////
   // Setup signal handler
-
-
+  pthread_t output_thread;
   pid_t pid;
+
   if ((pid = fork())) {
     // Limit stack memory of child to 4MB
     struct rlimit stack;
@@ -79,19 +81,20 @@ void main(int argc, char** argv)
     stack.rlim_max = 4000000;
     prlimit(pid, RLIMIT_STACK, &stack, NULL);
 
-    /*
-      TODO If the child occupies more than 4 MB of heap memory, it
-      should be killed and this event should be reported. The program
-      2.c does this.
-    */
-    struct rlimit data;
-    data.rlim_cur = 4000000;
-    data.rlim_max = 4000000;
-    prlimit(pid, RLIMIT_DATA, &data, NULL);
 
     /*
-      TODO If the child forks more than 20 times, it should be killed
-      and the event should be reported. The program 3.c does this.
+      If the child occupies more than 4 MB of heap memory, it should
+      be killed and this event should be reported. The program 2.c
+      does this.
+    */
+    /* struct rlimit data; */
+    /* data.rlim_cur = 4000000; */
+    /* data.rlim_max = 4000000; */
+    /* prlimit(pid, RLIMIT_DATA, &data, NULL); */
+
+    /*
+      If the child forks more than 20 times, it should be killed and
+      the event should be reported. The program 3.c does this.
     */
     struct rlimit nproc;
     nproc.rlim_cur = 20;
@@ -99,7 +102,7 @@ void main(int argc, char** argv)
     prlimit(pid, RLIMIT_NPROC, &nproc, NULL);
 
     /*
-      TODO If the child uses more than 1 CPU-second of computer time, it
+      If the child uses more than 1 CPU-second of computer time, it
       should be killed and this event should be reported. The program
       4.c does this.
     */
@@ -118,7 +121,7 @@ void main(int argc, char** argv)
 
 
     // TODO You must forward everything the child prints to stdout, even if you capture it yourself.
-
+    //pthread_create(&output_thread, NULL, (void*) &output_thread, (void*) pid);
 
     // WATCH PROCESS
     struct rusage usage;
@@ -126,7 +129,11 @@ void main(int argc, char** argv)
     wait3(&status, 0, &usage);
     print_usage(status, usage);
   } else {
-    // TODO See if this can be made more elegant
+    struct rlimit data;
+    data.rlim_cur = 4000000;
+    data.rlim_max = 4000000;
+    setrlimit(RLIMIT_DATA, &data);
+
     char* cmd[argc];
     for (int i = 0; i < argc; i++)
       cmd[i] = argv[i+1];
@@ -134,14 +141,15 @@ void main(int argc, char** argv)
     execvp(cmd[0], cmd);
   }
 
+  //pthread_join(output_thread, NULL);
   exit(0);
 }
 
 /**
- * TODO When the child dies, its total runtime, number of lines printed
- * to stdout, and time of death should be reported. After any of
- * these, the watch program should exit. A regular exit from watch
- * should also report time spent by the child.
+ * When the child dies, its total runtime, number of lines printed to
+ * stdout, and time of death should be reported. After any of these,
+ * the watch program should exit. A regular exit from watch should
+ * also report time spent by the child.
  *
  */
 void print_usage(int status, struct rusage usage)
@@ -153,4 +161,9 @@ void print_usage(int status, struct rusage usage)
   printf("Lines Printed: %ld \n", usage.ru_oublock);
   printf("Endtime: %s", ctime(&unixtime));
   printf("Status: %d\n", status);
+}
+
+void output_handler(void* p)
+{
+  pid_t pid = (pid_t) p;
 }

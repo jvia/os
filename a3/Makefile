@@ -1,4 +1,4 @@
-CFLAGS =  -std=gnu99 -D _GNU_SOURCE
+CFLAGS =  -std=gnu99 -D _GNU_SOURCE -pthread
 C_FILES = $(wildcard *.c)
 APPS = $(patsubst %.c,%,$(C_FILES))
 
