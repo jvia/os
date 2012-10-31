@@ -2,14 +2,6 @@
  * Assignment 3 -- Sandboxing a Process
  * 2012-10-23
  *
- * Part of the problem is to distinguish which behaviors can be
- * controlled through the operating system itself, which ones can be
- * controlled through monitoring, and which can only be controlled
- * partially due to extenuating circumstances. Some of the above
- * conditions are easy to assure, and some are impossible to
- * completely control. It is part of your task to determine which ones
- * are possible to accomplish.
- *
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -21,31 +13,19 @@
 #include <time.h>
 #include <pthread.h>
 
+#define BUF_SIZE 1024
+
 void print_usage(int, struct rusage);
-void output_handler(void*);
+void* outcap(void*);
 
-/**
-   - Some child conditions can be detected via signals. Use them if at
-   all possible! In particular, you will want to trap SIGCHLD in the
-   parent and react accordingly!
 
-   - Part of your program can be some form of "monitoring loop" in which
-   the program repeatedly measures the behavior of the child.
+int fd[2];
+int count = 0;
 
-   - Feel free to redirect I/O from the child to a subthread of your
-   watch process.
-
-   - You should presume that the child can do anything, including
-   changing its behavior according to all available system calls. You
-   cannot assume that the child won't try to get around your controls
-   via malicious means.
-
-   - In particular, note that you cannot install a signal handler in the
-   child, because during an exec, that handler would get overwritten!
-
-   - But the child is permitted to install its own signal handlers to
-   thwart your controls, and you must be able to handle that!
-*/
+// TODO Add handler for SIGXCPU
+// TODO Handle ENOMEM error bit
+// TODO Handle EAGAIN
+// TODO TODO Handle SIGSEGV
 
 void main(int argc, char** argv)
 {
@@ -54,86 +34,51 @@ void main(int argc, char** argv)
     exit(1);
   }
 
-  //////////////////////////////////////////////////////////////////////
-  // Set rlimits
-  /* struct rlimit o_stack; */
-  /* struct rlimit o_data; */
-  /* struct rlimit o_nproc; */
-  /* struct rlimit o_cpu; */
-
-  /* getrlimit(RLIMIT_STACK, &o_stack); */
-  /* getrlimit(RLIMIT_DATA,  &o_data); */
-  /* getrlimit(RLIMIT_NPROC, &o_nproc); */
-  /* getrlimit(RLIMIT_CPU,   &o_cpu); */
-
-
-
-
-  //////////////////////////////////////////////////////////////////////
-  // Setup signal handler
-  pthread_t output_thread;
-  pid_t pid;
-
+  pthread_t ou_daemon;
+  pipe(fd);
+ 
+  pid_t pid;  
   if ((pid = fork())) {
-    // Limit stack memory of child to 4MB
-    struct rlimit stack;
-    stack.rlim_cur = 4000000;
-    stack.rlim_max = 4000000;
-    prlimit(pid, RLIMIT_STACK, &stack, NULL);
-
-
-    /*
-      If the child occupies more than 4 MB of heap memory, it should
-      be killed and this event should be reported. The program 2.c
-      does this.
-    */
-    /* struct rlimit data; */
-    /* data.rlim_cur = 4000000; */
-    /* data.rlim_max = 4000000; */
-    /* prlimit(pid, RLIMIT_DATA, &data, NULL); */
-
-    /*
-      If the child forks more than 20 times, it should be killed and
-      the event should be reported. The program 3.c does this.
-    */
-    struct rlimit nproc;
-    nproc.rlim_cur = 20;
-    nproc.rlim_max = 20;
-    prlimit(pid, RLIMIT_NPROC, &nproc, NULL);
-
-    /*
-      If the child uses more than 1 CPU-second of computer time, it
-      should be killed and this event should be reported. The program
-      4.c does this.
-    */
-    struct rlimit cpu;
-    cpu.rlim_cur = 1;
-    cpu.rlim_max = 1;
-    prlimit(pid, RLIMIT_CPU, &cpu, NULL);
-
-    /*
-      TODO If the child produces more than 100 lines of output to
-      stdout, it should be killed and this should be reported. The
-      program 5.c does this.
-
-      Will need to dup its IO.
-    */
-
-
-    // TODO You must forward everything the child prints to stdout, even if you capture it yourself.
-    //pthread_create(&output_thread, NULL, (void*) &output_thread, (void*) pid);
-
-    // WATCH PROCESS
+    pthread_create(&ou_daemon, NULL, outcap, (void*) pid);
     struct rusage usage;
     int status;
     wait3(&status, 0, &usage);
     print_usage(status, usage);
   } else {
     struct rlimit data;
+    struct rlimit stack;
+    struct rlimit nproc;
+    struct rlimit cpu;
+
+    // Limit child to 4MB of heap
     data.rlim_cur = 4000000;
     data.rlim_max = 4000000;
-    setrlimit(RLIMIT_DATA, &data);
 
+    // Limit stack memory of child to 4MB
+    stack.rlim_cur = 4000000;
+    stack.rlim_max = 4000000;
+
+    // Limit child to 20 forks
+    nproc.rlim_cur = 20;
+    nproc.rlim_max = 20;
+
+    // Limit child to 1 CPU second
+    cpu.rlim_cur = 1;
+    cpu.rlim_max = 1;
+
+    // Set the rlimits
+    setrlimit(RLIMIT_DATA,  &data);
+    setrlimit(RLIMIT_STACK, &stack);
+    setrlimit(RLIMIT_NPROC, &nproc);
+    setrlimit(RLIMIT_CPU,   &cpu);
+
+    close(1);
+    dup(fd[1]);
+    close(fd[1]);
+    close(fd[0]);
+
+    //////////////////////////////////////////////////////////////////////
+    // Run the program in the sandbox
     char* cmd[argc];
     for (int i = 0; i < argc; i++)
       cmd[i] = argv[i+1];
@@ -141,7 +86,6 @@ void main(int argc, char** argv)
     execvp(cmd[0], cmd);
   }
 
-  //pthread_join(output_thread, NULL);
   exit(0);
 }
 
@@ -150,7 +94,6 @@ void main(int argc, char** argv)
  * stdout, and time of death should be reported. After any of these,
  * the watch program should exit. A regular exit from watch should
  * also report time spent by the child.
- *
  */
 void print_usage(int status, struct rusage usage)
 {
@@ -158,12 +101,25 @@ void print_usage(int status, struct rusage usage)
   unixtime = time(NULL);
   printf("Runtime: %f\n", usage.ru_utime.tv_sec + usage.ru_stime.tv_usec
          + (usage.ru_utime.tv_usec / 1000.) + (usage.ru_stime.tv_usec / 1000.));
-  printf("Lines Printed: %ld \n", usage.ru_oublock);
+  printf("Lines Printed: %d \n", count);
   printf("Endtime: %s", ctime(&unixtime));
   printf("Status: %d\n", status);
 }
 
-void output_handler(void* p)
+void* outcap(void* _pid)
 {
-  pid_t pid = (pid_t) p;
+  pid_t pid = (int) _pid;  
+  FILE* read = fdopen(fd[0], "r");
+
+  while (!feof(read)) {
+    if (++count >= 100) {
+      kill(pid, SIGKILL);
+      pthread_exit(NULL);
+    }
+    char buf[BUF_SIZE];
+    fgets(buf, BUF_SIZE, read);
+    printf("parent: %s", buf);
+  }
+
+  pthread_exit(NULL);
 }

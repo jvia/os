@@ -3,13 +3,13 @@ C_FILES = $(wildcard *.c)
 APPS = $(patsubst %.c,%,$(C_FILES))
 
 all: $(APPS)
+
+test: all
+	./watch ./1 \\
+	./watch ./2 \\
+	./watch ./3 \\
+	./watch ./4 \\
+	./watch ./5
+
 clean:
 	rm -f $(APPS)
-
-# all: 1 2 3 4 5 watch
-# 1: 1.c
-# 2: 2.c
-# 3: 3.c 
-# 4: 4.c
-# 5: 5.c
-# watch: watch.c
