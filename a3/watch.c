@@ -2,6 +2,21 @@
  * Assignment 3 -- Sandboxing a Process
  * 2012-10-23
  *
+ * COMPILLING: This program and be compiled with a call to
+ * `make'. Running `make test' will run the program with each
+ * misbehaving program in turn.
+ * 
+ * - - -
+ * 
+ * STACK CONDITION: Resource limits.
+
+ * HEAP CONDTION: Resource limits.
+ *
+ * FORK CONDITION: Resource limits.
+ *
+ * CPUTIME CONDITION: Resource limits.
+ * 
+ * STDOUT CONDITION: Capture child's stdout and count the lines.
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -12,20 +27,18 @@
 #include <sys/wait.h>
 #include <time.h>
 #include <pthread.h>
+#include <errno.h>
+#include <signal.h>
 
 #define BUF_SIZE 1024
 
 void print_usage(int, struct rusage);
 void* outcap(void*);
-
+void sighand(int);
 
 int fd[2];
 int count = 0;
-
-// TODO Add handler for SIGXCPU
-// TODO Handle ENOMEM error bit
-// TODO Handle EAGAIN
-// TODO TODO Handle SIGSEGV
+pthread_t ou_daemon;
 
 void main(int argc, char** argv)
 {
@@ -34,9 +47,12 @@ void main(int argc, char** argv)
     exit(1);
   }
 
-  pthread_t ou_daemon;
+  /* struct sigaction act; */
+  /* act.sa_handler = sighand; */
+  /* act.sa_flags = SA_RESTART; */
+  /* sigaction(SIGCHLD, &act, NULL); */
+
   pipe(fd);
- 
   pid_t pid;  
   if ((pid = fork())) {
     pthread_create(&ou_daemon, NULL, outcap, (void*) pid);
@@ -53,15 +69,12 @@ void main(int argc, char** argv)
     // Limit child to 4MB of heap
     data.rlim_cur = 4000000;
     data.rlim_max = 4000000;
-
     // Limit stack memory of child to 4MB
     stack.rlim_cur = 4000000;
     stack.rlim_max = 4000000;
-
     // Limit child to 20 forks
     nproc.rlim_cur = 20;
     nproc.rlim_max = 20;
-
     // Limit child to 1 CPU second
     cpu.rlim_cur = 1;
     cpu.rlim_max = 1;
@@ -72,12 +85,12 @@ void main(int argc, char** argv)
     setrlimit(RLIMIT_NPROC, &nproc);
     setrlimit(RLIMIT_CPU,   &cpu);
 
+    // Set up pipe betwen parent and child
     close(1);
     dup(fd[1]);
     close(fd[1]);
     close(fd[0]);
 
-    //////////////////////////////////////////////////////////////////////
     // Run the program in the sandbox
     char* cmd[argc];
     for (int i = 0; i < argc; i++)
@@ -89,18 +102,16 @@ void main(int argc, char** argv)
   exit(0);
 }
 
-/**
- * When the child dies, its total runtime, number of lines printed to
- * stdout, and time of death should be reported. After any of these,
- * the watch program should exit. A regular exit from watch should
- * also report time spent by the child.
- */
+
 void print_usage(int status, struct rusage usage)
 {
+  if (status != 0) fprintf(stderr, "Child killed (%d)\n", status);
   time_t unixtime;
   unixtime = time(NULL);
-  printf("Runtime: %f\n", usage.ru_utime.tv_sec + usage.ru_stime.tv_usec
-         + (usage.ru_utime.tv_usec / 1000.) + (usage.ru_stime.tv_usec / 1000.));
+  printf("Runtime: %f\n", usage.ru_utime.tv_sec
+         + usage.ru_stime.tv_usec
+         + (usage.ru_utime.tv_usec / 1000.)
+         + (usage.ru_stime.tv_usec / 1000.));
   printf("Lines Printed: %d \n", count);
   printf("Endtime: %s", ctime(&unixtime));
   printf("Status: %d\n", status);
@@ -118,8 +129,9 @@ void* outcap(void* _pid)
     }
     char buf[BUF_SIZE];
     fgets(buf, BUF_SIZE, read);
-    printf("parent: %s", buf);
+    printf("%s", buf);
   }
 
   pthread_exit(NULL);
 }
+
