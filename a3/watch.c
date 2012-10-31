@@ -34,11 +34,12 @@
 
 void print_usage(int, struct rusage);
 void* outcap(void*);
-void sighand(int);
 
+pid_t pid;  
 int fd[2];
 int count = 0;
 pthread_t ou_daemon;
+
 
 void main(int argc, char** argv)
 {
@@ -47,13 +48,9 @@ void main(int argc, char** argv)
     exit(1);
   }
 
-  /* struct sigaction act; */
-  /* act.sa_handler = sighand; */
-  /* act.sa_flags = SA_RESTART; */
-  /* sigaction(SIGCHLD, &act, NULL); */
-
+  // Make a pipe
   pipe(fd);
-  pid_t pid;  
+
   if ((pid = fork())) {
     pthread_create(&ou_daemon, NULL, outcap, (void*) pid);
     struct rusage usage;
@@ -61,21 +58,20 @@ void main(int argc, char** argv)
     wait3(&status, 0, &usage);
     print_usage(status, usage);
   } else {
-    struct rlimit data;
-    struct rlimit stack;
-    struct rlimit nproc;
-    struct rlimit cpu;
-
     // Limit child to 4MB of heap
+    struct rlimit data;
     data.rlim_cur = 4000000;
     data.rlim_max = 4000000;
     // Limit stack memory of child to 4MB
+    struct rlimit stack;
     stack.rlim_cur = 4000000;
     stack.rlim_max = 4000000;
     // Limit child to 20 forks
+    struct rlimit nproc;
     nproc.rlim_cur = 20;
     nproc.rlim_max = 20;
     // Limit child to 1 CPU second
+    struct rlimit cpu;
     cpu.rlim_cur = 1;
     cpu.rlim_max = 1;
 
@@ -102,7 +98,9 @@ void main(int argc, char** argv)
   exit(0);
 }
 
-
+/**
+ * Print end process information.
+ */
 void print_usage(int status, struct rusage usage)
 {
   if (status != 0) fprintf(stderr, "Child killed (%d)\n", status);
@@ -117,6 +115,9 @@ void print_usage(int status, struct rusage usage)
   printf("Status: %d\n", status);
 }
 
+/**
+ * Monitor child output.
+ */
 void* outcap(void* _pid)
 {
   pid_t pid = (int) _pid;  
