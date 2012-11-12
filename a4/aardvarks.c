@@ -5,13 +5,15 @@
 #define TRUE  1
 #define FALSE 0
 
+
 int initialized = FALSE;
 sem_t hill[ANTHILLS];
 int slurping[ANTHILLS];
 int ants_left[ANTHILLS];
 pthread_t unlocker;
-double slurp_time[AARDVARKS];
+
 int slurp_hill[AARDVARKS];
+double slurp_time[AARDVARKS];
 
 /**
  * Manages the eating in a thread safe way.
@@ -21,18 +23,30 @@ int slurp_hill[AARDVARKS];
  */
 void eat(char name, int i)
 {
+  int avark = name - 'A';
+
   if ((ants_left[i] > slurping[i])  &&  (sem_trywait(&hill[i])) != -1) {
     ++slurping[i];
+    slurp_hill[avark] = i;
+    slurp_time[avark] = elapsed() + 1.;
     slurp(name, i);
     --ants_left[i];
     --slurping[i];
     sem_post(&hill[i]);
+    slurp_hill[avark] = -1;
   }
 }
 
 void* unlock_sempahores(void* arg)
 {
-
+  int i;
+  while(TRUE) {
+    printf("------------------------------\n");
+    printf("ELAPSED: %f\n", elapsed());
+    for(i = 0; i < AARDVARKS; ++i)
+      printf("%2d: HILL %2d TIME %f\n", i, slurp_hill[i], slurp_time[i]);
+    sleep(1);
+  }
 }
 
 
@@ -61,8 +75,8 @@ void *thread_A(void *input) {
     pthread_create(&unlocker, NULL, unlock_sempahores, NULL);
 
     for(i = 0; i < AARDVARKS; ++i) {
-      slurp_time[i] = 0.0;
-      slurp_hill[i] = 0;
+      slurp_hill[i] = -1;
+      slurp_time[i] =  0;
     }
 
     initialized = TRUE;
