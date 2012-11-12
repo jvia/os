@@ -7,12 +7,18 @@
 
 int initialized = FALSE;
 sem_t hill[ANTHILLS];
-int slurping[ANTHILLS];// = {0, 0, 0, 0};
-int ants_left[ANTHILLS];// = {
-//  ANTS_PER_HILL, ANTS_PER_HILL, ANTS_PER_HILL, ANTS_PER_HILL
-//};
+int slurping[ANTHILLS];
+int ants_left[ANTHILLS];
+pthread_t unlocker;
+double slurp_time[AARDVARKS];
+int slurp_hill[AARDVARKS];
 
-
+/**
+ * Manages the eating in a thread safe way.
+ *
+ * Manages the number of aardvarks on a hill and the number of ants on
+ * a hill for optimality.
+ */
 void eat(char name, int i)
 {
   if ((ants_left[i] > slurping[i])  &&  (sem_trywait(&hill[i])) != -1) {
@@ -24,8 +30,14 @@ void eat(char name, int i)
   }
 }
 
+void* unlock_sempahores(void* arg)
+{
+
+}
+
+
 /**
- *
+ * Thread code. Simply calls eat while there are ants left.
  */
 void *my_thread(void *input) { 
   char aname = *(char*) input;
@@ -35,16 +47,24 @@ void *my_thread(void *input) {
 } 
 
 /**
- *
+ * Initializes state and then runs thread code.
  */
 void *thread_A(void *input) { 
   if (!initialized) {
-    int i = 0;
+    int i;
     for (i = 0; i < ANTHILLS; ++i) {
       ants_left[i] = ANTS_PER_HILL;
       slurping[i] = 0;
       sem_init(&hill[i], 0, AARDVARKS_PER_HILL);
     }
+
+    pthread_create(&unlocker, NULL, unlock_sempahores, NULL);
+
+    for(i = 0; i < AARDVARKS; ++i) {
+      slurp_time[i] = 0.0;
+      slurp_hill[i] = 0;
+    }
+
     initialized = TRUE;
   }  
   return my_thread(input); 
