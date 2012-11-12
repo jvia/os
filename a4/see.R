@@ -86,7 +86,7 @@ plot.allHistory <- function(all, low=0, high=1e25) {
 	    rectangles[[depict]][[dimension]]=array() 
 	} 
     } 
-    srects = list(); 
+    srects = list();
     for (where in c(1,2,3)) { 
 	srects[[where]]=list() 
 	for (dimension in c('xbot','xtop', 'ybot', 'ytop')) { 
