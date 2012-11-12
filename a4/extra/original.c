@@ -5,53 +5,27 @@
 #define TRUE  1
 #define FALSE 0
 
-int initialized = FALSE;
-sem_t hill[ANTHILLS];
-int slurping[ANTHILLS];// = {0, 0, 0, 0};
-int ants_left[ANTHILLS];// = {
-//  ANTS_PER_HILL, ANTS_PER_HILL, ANTS_PER_HILL, ANTS_PER_HILL
-//};
+int initialized=FALSE; // semaphores and mutexes are not initialized 
 
-
-void eat(char name, int i)
-{
-  if ((ants_left[i] > slurping[i])  &&  (sem_trywait(&hill[i])) != -1) {
-    ++slurping[i];
-    slurp(name, i);
-    --ants_left[i];
-    --slurping[i];
-    sem_post(&hill[i]);
-  }
-}
-
-/**
- *
- */
+// define your mutexes and semaphores here 
 void *my_thread(void *input) { 
-  char aname = *(char*) input;
-  while (chow_time())
-    eat(aname, lrand48() % ANTHILLS);
+  char aname = *(char *)input; // name of aardvark, for debugging
+  while (chow_time()) { 
+    // Should only eat if there enough ants and not too many aardvarks
+    slurp(aname, lrand48() % ANTHILLS);
+  }
   return NULL; 
 } 
 
-/**
- *
- */
+// first thread initializes mutexes 
 void *thread_A(void *input) { 
   if (!initialized) {
-    int i = 0;
-    for (i = 0; i < ANTHILLS; ++i) {
-      ants_left[i] = ANTS_PER_HILL;
-      slurping[i] = 0;
-      sem_init(&hill[i], 0, AARDVARKS_PER_HILL);
-    }
-    initialized = TRUE;
+    initialized=TRUE;
   }  
   return my_thread(input); 
 }
 
-//////////////////////////////////////////////////////////////////////
-// Other threads
+// other threads proceed after initialization
 void *thread_B(void *input) { 
   while (!initialized);
   return my_thread(input); 

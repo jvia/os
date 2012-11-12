@@ -1,4 +1,4 @@
-#include "/comp/111/p/assignments/a4/extra/anthills.h" 
+#include "anthills.h"
 
 // note: need to serialize concept of state
 // for ease of debugging 
