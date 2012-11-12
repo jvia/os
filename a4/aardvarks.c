@@ -7,23 +7,19 @@
 
 int initialized = FALSE;
 sem_t hill[ANTHILLS];
+int slurping[ANTHILLS] = {0, 0, 0, 0};
 int ants_left[ANTHILLS] = {
   ANTS_PER_HILL, ANTS_PER_HILL, ANTS_PER_HILL, ANTS_PER_HILL
 };
 
+
 void eat(char name, int i)
 {
-  int semval, full_slots;
-
-  // Calc how many aardvarks on the hillx
-  sem_getvalue(&hill[i], &semval);
-  full_slots = AARDVARKS_PER_HILL - semval;
-
-  if ((ants_left[i] > full_slots)  &&  (sem_trywait(&hill[i])) != -1) {
-    if (ants_left[i] > 0) {
-      slurp(name, i);
-      --ants_left[i];
-    }
+  if ((ants_left[i] > slurping[i])  &&  (sem_trywait(&hill[i])) != -1) {
+    ++slurping[i];
+    slurp(name, i);
+    --ants_left[i];
+    --slurping[i];
     sem_post(&hill[i]);
   }
 }
