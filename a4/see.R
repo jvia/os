@@ -63,10 +63,10 @@ plot.allHistory <- function(all, low=0, high=1e25) {
 
     # colors for hills 
     hcolors <- list() 
-    hcolors[[1]] <- 'seagreen' 
+    hcolors[[1]] <- 'darkgreen' 
     hcolors[[2]] <- 'green' 
     hcolors[[3]] <- 'lightgreen' 
-    hcolors[[4]] <- 'blue' 
+    hcolors[[4]] <- 'springgreen' 
 
     # data on each anteater 
     count <- 0; 
@@ -86,8 +86,8 @@ plot.allHistory <- function(all, low=0, high=1e25) {
 	    rectangles[[depict]][[dimension]]=array() 
 	} 
     } 
-    srects = list();
-    for (where in c(1,2,3)) { 
+    srects = list(); 
+    for (where in anthills) { 
 	srects[[where]]=list() 
 	for (dimension in c('xbot','xtop', 'ybot', 'ytop')) { 
 	    srects[[where]][[dimension]]=array() 
@@ -157,7 +157,7 @@ plot.allHistory <- function(all, low=0, high=1e25) {
 
     for (depict in c('slurping', 'idle','swallowing','sulking', 'jailed')) {
 	if (depict == 'slurping') { 
- 	    for (where in c(1:3)) { 
+ 	    for (where in anthills) { 
  		color <- hcolors[[where]]
  		plotlist <- srects[[where]]
  		rect(plotlist$xbot,plotlist$ybot,plotlist$xtop,plotlist$ytop,col=color,border=color)

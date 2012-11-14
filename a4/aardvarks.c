@@ -1,19 +1,31 @@
 #include "anthills.h" 
 #include <pthread.h>
 #include <semaphore.h>
+#include <time.h>
 
 #define TRUE  1
 #define FALSE 0
 
 
+struct aardvark {
+  int hill;     // Hill being slurped
+  double time; //  Time when slurping finishes
+};
+
+struct anthill {
+  int ants_left;
+  int slurping;
+}
+
+struct timespec slptime = { 0, 500000000L }; // Half second
+
 int initialized = FALSE;
 sem_t hill[ANTHILLS];
 int slurping[ANTHILLS];
 int ants_left[ANTHILLS];
+struct aardvark aardvarks[AARDVARKS];
 pthread_t unlocker;
 
-int slurp_hill[AARDVARKS];
-double slurp_time[AARDVARKS];
 
 /**
  * Manages the eating in a thread safe way.
@@ -24,31 +36,31 @@ double slurp_time[AARDVARKS];
 void eat(char name, int i)
 {
   int avark = name - 'A';
-
   if ((ants_left[i] > slurping[i])  &&  (sem_trywait(&hill[i])) != -1) {
     ++slurping[i];
-    slurp_hill[avark] = i;
-    slurp_time[avark] = elapsed() + 1.;
+    aardvarks[avark].hill = i;
+    aardvarks[avark].time = elapsed() + 1.;
     slurp(name, i);
-    --ants_left[i];
-    --slurping[i];
-    sem_post(&hill[i]);
-    slurp_hill[avark] = -1;
   }
 }
 
-void* unlock_sempahores(void* arg)
+void* auto_sem_poster(void* _unused)
 {
   int i;
   while(TRUE) {
-    printf("------------------------------\n");
-    printf("ELAPSED: %f\n", elapsed());
-    for(i = 0; i < AARDVARKS; ++i)
-      printf("%2d: HILL %2d TIME %f\n", i, slurp_hill[i], slurp_time[i]);
-    sleep(1);
+    for (i = 0; i < AARDVARKS; ++i) {
+      int h = aardvarks[i].hill;
+      if (h >= 0 && elapsed() > aardvarks[i].time) {
+        --ants_left[h];
+        --slurping[h];
+        aardvarks[i].hill = -1;
+        aardvarks[i].time = 0.;
+        sem_post(&hill[h]);
+      }
+
+    }
   }
 }
-
 
 /**
  * Thread code. Simply calls eat while there are ants left.
@@ -66,21 +78,21 @@ void *my_thread(void *input) {
 void *thread_A(void *input) { 
   if (!initialized) {
     int i;
-    for (i = 0; i < ANTHILLS; ++i) {
+    for(i = 0; i < ANTHILLS; ++i) {
       ants_left[i] = ANTS_PER_HILL;
       slurping[i] = 0;
       sem_init(&hill[i], 0, AARDVARKS_PER_HILL);
     }
 
-    pthread_create(&unlocker, NULL, unlock_sempahores, NULL);
-
-    for(i = 0; i < AARDVARKS; ++i) {
-      slurp_hill[i] = -1;
-      slurp_time[i] =  0;
+    for (i = 0; i <AARDVARKS; ++i) {
+      aardvarks[i].hill = -1;
+      aardvarks[i].time = 0.;
     }
 
+    pthread_create(&unlocker, NULL, auto_sem_poster, NULL);
+
     initialized = TRUE;
-  }  
+  }
   return my_thread(input); 
 }
 
@@ -95,35 +107,35 @@ void *thread_C(void *input) {
     return my_thread(input); 
 } 
 void *thread_D(void *input) { 
-    while (!initialized);
-    return my_thread(input); 
+  while (!initialized);
+  return my_thread(input); 
 } 
 void *thread_E(void *input) { 
-    while (!initialized);
-    return my_thread(input); 
+  while (!initialized);
+  return my_thread(input); 
 } 
 void *thread_F(void *input) { 
-    while (!initialized);
-    return my_thread(input); 
+  while (!initialized);
+  return my_thread(input); 
 } 
 void *thread_G(void *input) { 
-    while (!initialized);
-    return my_thread(input); 
+  while (!initialized);
+  return my_thread(input); 
 } 
 void *thread_H(void *input) { 
-    while (!initialized);
-    return my_thread(input); 
+  while (!initialized);
+  return my_thread(input); 
 } 
 void *thread_I(void *input) { 
-    while (!initialized);
-    return my_thread(input); 
+  while (!initialized);
+  return my_thread(input); 
 } 
 void *thread_J(void *input) { 
-    while (!initialized);
-    return my_thread(input); 
+  while (!initialized);
+  return my_thread(input); 
 } 
 void *thread_K(void *input) { 
-    while (!initialized);
-    return my_thread(input); 
+  while (!initialized);
+  return my_thread(input); 
 } 
 
