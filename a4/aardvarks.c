@@ -15,7 +15,7 @@ struct aardvark {
 struct anthill {
   int ants_left;
   int slurping;
-}
+};
 
 struct timespec slptime = { 0, 500000000L }; // Half second
 
