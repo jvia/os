@@ -31,7 +31,7 @@ void eat(char name, int i)
   if ((ants_left[i] > slurping[i])  &&  (sem_trywait(&hill[i])) != -1) {
     ++slurping[i];
     aardvarks[avark].hill = i;
-    aardvarks[avark].time = elapsed() + 1.;
+    aardvarks[avark].time = elapsed() + 1.01;
     slurp(name, i);
   }
 }
