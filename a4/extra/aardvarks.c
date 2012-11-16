@@ -6,13 +6,10 @@
 #define TRUE  1
 #define FALSE 0
 
-
 struct aardvark {
   int hill;     // Hill being slurped
   double time; //  Time when slurping finishes
 };
-
-struct timespec slptime = { 0, 500000000L }; // Half second
 
 int initialized = FALSE;
 sem_t hill[ANTHILLS];
@@ -31,21 +28,11 @@ pthread_t unlocker;
 void eat(char name, int i)
 {
   int avark = name - 'A';
-
   if ((ants_left[i] > slurping[i])  &&  (sem_trywait(&hill[i])) != -1) {
     ++slurping[i];
-
     aardvarks[avark].hill = i;
     aardvarks[avark].time = elapsed() + 1.;
- 
     slurp(name, i);
-
-    // To be done by auto_sem_poster
-    //--ants_left[i];
-    //--slurping[i];
-    //aardvarks[avark].hill = -1;
-    //aardvarks[avark].time = 0.;
-    //sem_post(&hill[i]);
   }
 }
 
@@ -53,25 +40,16 @@ void* auto_sem_poster(void* _unused)
 {
   int i;
   while(TRUE) {
-    //printf("ELAPSED: %f\n", elapsed());
     for (i = 0; i < AARDVARKS; ++i) {
-      //printf("VARK %2d :: %2d  %5f%c\n", i,
-      //       aardvarks[i].hill, aardvarks[i].time,
-      //       (aardvarks[i].hill >= 0 && elapsed() > aardvarks[i].time) ? '*' :' ');
-
-      if (aardvarks[i].hill >= 0 && elapsed() > aardvarks[i].time) {
-        int h = aardvarks[i].hill;
-        --ants_left[h];
-        --slurping[h];
+      int h = aardvarks[i].hill;
+      if (h >= 0 && elapsed() > aardvarks[i].time) {
         aardvarks[i].hill = -1;
         aardvarks[i].time = 0.;
+        --ants_left[h];
+        --slurping[h];
         sem_post(&hill[h]);
       }
-
     }
-    //printf("--------------------\n");
-    //nanosleep(&slptime, NULL);
-    
   }
 }
 
@@ -91,13 +69,14 @@ void *my_thread(void *input) {
 void *thread_A(void *input) { 
   if (!initialized) {
     int i;
+
     for(i = 0; i < ANTHILLS; ++i) {
       ants_left[i] = ANTS_PER_HILL;
       slurping[i] = 0;
       sem_init(&hill[i], 0, AARDVARKS_PER_HILL);
     }
 
-    for (i = 0; i <AARDVARKS; ++i) {
+    for (i = 0; i < AARDVARKS; ++i) {
       aardvarks[i].hill = -1;
       aardvarks[i].time = 0.;
     }
@@ -106,6 +85,7 @@ void *thread_A(void *input) {
 
     initialized = TRUE;
   }
+
   return my_thread(input); 
 }
 
