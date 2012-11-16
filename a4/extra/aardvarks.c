@@ -1,4 +1,9 @@
 
+/**
+ * Extra credit version. Does not seem to work on lab machines. Works
+ * on Xubuntu 12.04. Would like advice on it. There seems to be a race
+ * condition on the decrementing `ants_left`.
+ */
 #include "/comp/111/a/a4/anthills.h" 
 #include <pthread.h>
 #include <semaphore.h>
