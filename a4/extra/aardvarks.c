@@ -1,3 +1,4 @@
+
 #include "anthills.h" 
 #include <pthread.h>
 #include <semaphore.h>
@@ -5,6 +6,7 @@
 
 #define TRUE  1
 #define FALSE 0
+#define UNLOCKER 1
 
 struct aardvark {
   int hill;     // Hill being slurped
@@ -18,7 +20,6 @@ int ants_left[ANTHILLS];
 struct aardvark aardvarks[AARDVARKS];
 pthread_t unlocker;
 
-
 /**
  * Manages the eating in a thread safe way.
  *
@@ -28,11 +29,16 @@ pthread_t unlocker;
 void eat(char name, int i)
 {
   int avark = name - 'A';
-  if ((ants_left[i] > slurping[i])  &&  (sem_trywait(&hill[i])) != -1) {
+  if ((ants_left[i] > slurping[i])  &&  (sem_trywait(&hill[i]) != -1)) {
     ++slurping[i];
     aardvarks[avark].hill = i;
-    aardvarks[avark].time = elapsed() + 1.01;
+    aardvarks[avark].time = elapsed() + 1.1;
     slurp(name, i);
+    if(!UNLOCKER) {
+      --ants_left[i];
+      --slurping[i];
+      sem_post(&hill[i]);
+    }
   }
 }
 
@@ -40,9 +46,15 @@ void* auto_sem_poster(void* _unused)
 {
   int i;
   while(TRUE) {
+    // Gross hack to deal with race condition
+    if (chow_time() && !(ants_left[0] || ants_left[1])) {
+      ants_left[0]++;
+      ants_left[1]++;
+    }
+      
     for (i = 0; i < AARDVARKS; ++i) {
       int h = aardvarks[i].hill;
-      if (h >= 0 && elapsed() > aardvarks[i].time) {
+      if ((h >= 0) && (elapsed() > aardvarks[i].time)) {
         aardvarks[i].hill = -1;
         aardvarks[i].time = 0.;
         --ants_left[h];
@@ -52,6 +64,7 @@ void* auto_sem_poster(void* _unused)
     }
   }
 }
+
 
 /**
  * Thread code. Simply calls eat while there are ants left.
@@ -74,14 +87,16 @@ void *thread_A(void *input) {
       ants_left[i] = ANTS_PER_HILL;
       slurping[i] = 0;
       sem_init(&hill[i], 0, AARDVARKS_PER_HILL);
+      sem_init(&aard[i], 0, AARDVARKS_PER_HILL);
     }
 
-    for (i = 0; i < AARDVARKS; ++i) {
-      aardvarks[i].hill = -1;
-      aardvarks[i].time = 0.;
+    if (UNLOCKER) {
+      for (i = 0; i < AARDVARKS; ++i) {
+        aardvarks[i].hill = -1;
+        aardvarks[i].time = 0.;
+      }
+      pthread_create(&unlocker, NULL, auto_sem_poster, NULL);
     }
-
-    pthread_create(&unlocker, NULL, auto_sem_poster, NULL);
 
     initialized = TRUE;
   }
