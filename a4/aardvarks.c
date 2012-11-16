@@ -1,4 +1,4 @@
-#include "anthills.h" 
+#include "/comp/111/a/a4/anthills.h"
 #include <pthread.h>
 #include <semaphore.h>
 #include <time.h>
@@ -12,12 +12,6 @@ struct aardvark {
   double time; //  Time when slurping finishes
 };
 
-struct anthill {
-  int ants_left;
-  int slurping;
-};
-
-struct timespec slptime = { 0, 500000000L }; // Half second
 
 int initialized = FALSE;
 sem_t hill[ANTHILLS];
@@ -44,23 +38,6 @@ void eat(char name, int i)
     --ants_left[i];
     --slurping[i];
     sem_post(&hill[i]);
-  }
-}
-
-void* auto_sem_poster(void* _unused)
-{
-  int i;
-  while(TRUE) {
-    for (i = 0; i < AARDVARKS; ++i) {
-      int h = aardvarks[i].hill;
-      if (h >= 0 && elapsed() > aardvarks[i].time) {
-        aardvarks[i].hill = -1;
-        aardvarks[i].time = 0.;
-        --ants_left[h];
-        --slurping[h];
-        sem_post(&hill[h]);
-      }
-    }
   }
 }
 
@@ -91,8 +68,6 @@ void *thread_A(void *input) {
       aardvarks[i].hill = -1;
       aardvarks[i].time = 0.;
     }
-
-    //pthread_create(&unlocker, NULL, auto_sem_poster, NULL);
 
     initialized = TRUE;
   }

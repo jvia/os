@@ -1,5 +1,5 @@
 
-#include "anthills.h" 
+#include "/comp/111/a/a4/anthills.h" 
 #include <pthread.h>
 #include <semaphore.h>
 #include <time.h>
