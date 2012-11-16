@@ -87,7 +87,6 @@ void *thread_A(void *input) {
       ants_left[i] = ANTS_PER_HILL;
       slurping[i] = 0;
       sem_init(&hill[i], 0, AARDVARKS_PER_HILL);
-      sem_init(&aard[i], 0, AARDVARKS_PER_HILL);
     }
 
     if (UNLOCKER) {
