@@ -781,7 +781,7 @@ int main(long argc, char **argv, char **envp) {
 		errors++; 
 	    } 
 	} else if (strcmp(argv[i],"-procs")==0) { 
-	    if (sscanf(argv[++i],"%d",&procs)!=1) {
+	    if (sscanf(argv[++i],"%ld",&procs)!=1) {
 		fprintf(stderr,
 		    "t4: could not read number of processors from command line\n"); 
 		errors++; 
@@ -820,8 +820,8 @@ int main(long argc, char **argv, char **envp) {
         allage(); 	 // advance time for page wait variables. 
         callyou(); 	 // call your program
 	sysclock++;      // remember new time. 
-	allblocked();    // deadlock detection 
+	allblocked();    // deadlock detection
     } 
-    allscore(); 
+    allscore();
     // printf("pagesavail=%d\n",pagesavail);
 } 

@@ -1,17 +1,12 @@
-all: a.out see.R
-a.out: t5.o a5.o 
-	gcc -g t5.o a5.o
+all: a5 see.R
+a5: t5.o a5.o 
+	gcc -ggdb t5.o a5.o -o a5
 t5: t5.o a5.o 
-	gcc -g -o t5 t5.o a5.o
+	gcc -ggdb -o t5 t5.o a5.o
 t5.o: t5.c programs.c t5.h 
-	gcc -g -c t5.c 
+	gcc -ggdb -c t5.c 
 a5.o: a5.c t5.h 
-	gcc -g -c a5.c 
-t5.c: /comp/111/assign/a5/t5.c
-	ln -s /comp/111/assign/a5/t5.c .
-see.R: /comp/111/assign/a5/see.R
-	ln -s /comp/111/assign/a5/see.R .
-t5.h: /comp/111/assign/a5/t5.h 
-	ln -s /comp/111/assign/a5/t5.h .
-programs.c: /comp/111/assign/a5/programs.c 
-	ln -s /comp/111/assign/a5/programs.c .
+	gcc -ggdb -c a5.c 
+
+clean:
+	rm a5
