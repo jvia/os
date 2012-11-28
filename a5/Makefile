@@ -14,5 +14,8 @@ tags:
 clean-tags:
 	rm TAGS
 
+docs:
+	doxygen doc.conf
+
 clean:
-	rm -r a5 *.o html latex *.csv
+	rm  a5 *.o *.csv
