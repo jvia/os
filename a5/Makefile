@@ -19,7 +19,7 @@ tags:
 clean-tags:
 	rm TAGS
 
-docs:
+docs: clean-docs
 	doxygen doc.conf
 
 clean-docs:

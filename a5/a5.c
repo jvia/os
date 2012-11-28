@@ -19,7 +19,7 @@
 #define PRD (1 << 2) // @def PRD use a predictive replacement algorithm
 #define PSM (1 << 3) // @def PSM use a probabilistic state machine algorithm
 
-#define PAGER RDM
+#define PAGER LRU
 
 // proc: process to work upon (0-19) 
 // page: page to put in (0-19)
@@ -64,13 +64,25 @@ int used_pages(Pentry q[MAXPROCESSES]) {
   return total;
 }
 
+int all_inactive(Pentry q[MAXPROCESSES])
+{
+  for (int proc = 0; proc < MAXPROCESSES; proc++) {
+    if (q[proc].active) return 0;
+  }
+  return 1;
+}
+
+/**
+ * Initial page load.
+ *
+ * The goal is to get as many processes running as possible.
+ */
 void initial_page(Pentry q[MAXPROCESSES]) {
   int proc, pc, page;
 
   for (proc = 0; proc < MAXPROCESSES / 2; proc++) {
     if (!q[proc].active) {
       proc--; 
-      printf ("inactive\n");
       continue;
     }
 
@@ -94,20 +106,7 @@ void pageit(Pentry q[MAXPROCESSES]) {
 
   // page in two pages for 1/2 of processes
   if (tick == 0) {
-    for (proc = 0; proc < MAXPROCESSES / 2; proc++) {
-      if (!q[proc].active) {
-        proc--; 
-        printf ("inactive\n");
-        continue;
-      }
-
-      pc = q[proc].pc; 
-      page = pc / PAGESIZE;
-
-      pagein(proc, page);
-      pagein(proc, page + 1);
-
-    }
+    initial_page(q);
     tick++;
     return;
   }
@@ -129,8 +128,6 @@ void pageit(Pentry q[MAXPROCESSES]) {
         }
  
       }
-
-      //break;
     } 
   }
   tick++;
@@ -143,32 +140,59 @@ void pageit(Pentry q[MAXPROCESSES]) {
  * @param q the process state
  */
 void pageit(Pentry q[MAXPROCESSES]) { 
-  static int tick = 0; // artificial time
   static int timestamps[MAXPROCESSES][MAXPROCPAGES];
+  int proc, pc, page, oldpage;
 
-  // these are regular dynamic variables on stack
-  int proc,pc,page,oldpage,i,lru,lru_tick;
+  // Initial page load
+  if (tick == 0) {
+    initial_page(q);
+    tick++;
+    return;
+  }
 
-  // select first active process 
-  for (proc = 0; proc < MAXPROCESSES; proc++) {
+
+  for (proc = 0; proc < MAXPROCESSES; proc++) { 
     if (q[proc].active) { 
-      pc = q[proc].pc;
+
+      pc = q[proc].pc; 
       page = pc / PAGESIZE;
-      timestamps[proc][page] = tick;
-      if (!q[proc].pages[page] && !pagein(proc,page)) {
-        for (oldpage = 0; oldpage < q[proc].npages; oldpage++) {
-          if (timestamps[proc][oldpage] <= lru_tick && oldpage != page) {
-            lru = oldpage;
-            lru_tick = timestamps[proc][oldpage];
+
+      if (!q[proc].pages[page]) {
+        if (!pagein(proc,page)) {
+          for (oldpage = 0; oldpage<q[proc].npages; oldpage++) {
+            if (oldpage != page) {
+              pageout(proc, oldpage);
+            }
           }
         }
-        if (pageout(proc,lru)) {
-          break;
-        }
-      } 
+      }
+    } 
+  }
+
+  // Update page usage time by determing which page each process is
+  // currently using and resetting its value back to 0, while
+  // increasing each other page.
+  for (proc = 0; proc < MAXPROCESSES; proc++) {
+    int cur_page = q[proc].pc / PAGESIZE;
+    for (page = 0; page < MAXPROCPAGES; page++) {
+      if (page == cur_page)
+        timestamps[proc][page] = 0;
+      else
+        timestamps[proc][page]++;
     }
-    break;
-  } 
+  }
+
+  
+  // Print out ifo at end
+  if (all_inactive(q)) {
+    for (int i = 0; i < MAXPROCPAGES; ++i) {
+        for (int j = 0; j < MAXPROCPAGES; ++j) {
+          printf ("%6d ", timestamps[i][j]);
+        }
+        printf ("\n");
+    }
+  }
+
   tick++;
 } 
 

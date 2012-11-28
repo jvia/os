@@ -397,7 +397,9 @@ static long process_step(int pnum, Process *q) {
 } 
    
 
-/* public routine: swap one page out */ 
+/**
+ * Public routine: swap one page out .
+*/ 
 int pageout(int process, int page) { 
     if (process<0 || process>=procs 
      || !processes[process]
@@ -414,7 +416,9 @@ sim_log(LOG_PAGE,"process=%2d page=%3d start pageout\n",process,page);
     processes[process]->pages[page]=-1; return TRUE;
 } 
 
-/* public routine: swap one page in */ 
+/**
+ * Public routine: swap one page in.
+ */ 
 int pagein(int process, int page) { 
     if (process<0 || process>=procs 
      || !processes[process]
