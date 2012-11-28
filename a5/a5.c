@@ -33,20 +33,36 @@
  * @param q the state of every process
  */
 void pageit(Pentry q[MAXPROCESSES]) { 
-   int proc,pc,page,oldpage; 
-   for (proc = 0; proc<MAXPROCESSES; proc++) { 
-      if (q[proc].active) { 
-	 pc = q[proc].pc; 
-         page = pc / PAGESIZE;
-         if (!q[proc].pages[page] &&!pagein(proc,page)) { 
-           for (oldpage = 0; oldpage<q[proc].npages; oldpage++)
-             if (oldpage != page && pageout(proc,oldpage)) {
-               break; 
-             } 
-	 }
-	 break;
-      } 
-   } 	
+  int proc,pc,page,oldpage; 
+  for (proc = 0; proc<MAXPROCESSES; proc++) { 
+    if (q[proc].active) { 
+      pc = q[proc].pc; 
+      page = pc / PAGESIZE;
+
+      double prod = (double) pc / (double) PAGESIZE;
+      if (q[proc].pages[page] && prod < 0.5) continue;
+
+      if (!q[proc].pages[page] && !pagein(proc,page)) { 
+        for (oldpage = 0; oldpage<q[proc].npages; oldpage++)
+          if (oldpage != page && pageout(proc,oldpage)) {
+            //break;
+          } 
+      }
+
+      if (prod > 0.8 && page < 19) {
+        page++;
+        if (!q[proc].pages[page] && !pagein(proc,page)) { 
+          for (oldpage = 0; oldpage<q[proc].npages; oldpage++)
+            if (oldpage != page && oldpage != (page-1)  && pageout(proc,oldpage)) {
+              //break;
+            } 
+        }        
+      }
+
+      break;
+    } 
+  }
+
 } 
 #elif PAGER == LRU
 /**
@@ -98,29 +114,29 @@ void pageit(Pentry q[MAXPROCESSES]) {
 void pageit(Pentry q[MAXPROCESSES]) { 
   //////////////////////////////////////////////////////////////////////
   // persistent function variables
-   static int tick = 0; // artificial time
-   static int timestamps[MAXPROCESSES][MAXPROCPAGES]; 
+  static int tick = 0; // artificial time
+  static int timestamps[MAXPROCESSES][MAXPROCPAGES]; 
 
-   // these are regular dynamic variables on stack
-   int proc,pc,page,oldpage; 
+  // these are regular dynamic variables on stack
+  int proc,pc,page,oldpage; 
 
-   // select first active process 
-   for (proc = 0; proc < MAXPROCESSES; proc++) { 
-      if (q[proc].active) { 
-	 pc = q[proc].pc;
-         page = pc/PAGESIZE;
-	 timestamps[proc][page] = tick;
-         if (!q[proc].pages[page]) {
-	    if (!pagein(proc,page)) {
-	       for (oldpage = 0; oldpage<q[proc].npages; oldpage++) {
-		  if (oldpage!=page && pageout(proc,oldpage)) break; 
- 		} 
-	    } 
-	 }
-	 break; // no more 
-      } 
-   } 	
-   tick++; // advance time for next iteration
+  // select first active process 
+  for (proc = 0; proc < MAXPROCESSES; proc++) { 
+    if (q[proc].active) { 
+      pc = q[proc].pc;
+      page = pc/PAGESIZE;
+      timestamps[proc][page] = tick;
+      if (!q[proc].pages[page]) {
+        if (!pagein(proc,page)) {
+          for (oldpage = 0; oldpage<q[proc].npages; oldpage++) {
+            if (oldpage!=page && pageout(proc,oldpage)) break; 
+          } 
+        } 
+      }
+      break; // no more 
+    } 
+  } 	
+  tick++; // advance time for next iteration
 }
 
 #elif PAGER == PSM
@@ -130,34 +146,34 @@ void pageit(Pentry q[MAXPROCESSES]) {
 void pageit(Pentry q[MAXPROCESSES]) { 
   //////////////////////////////////////////////////////////////////////
   // persistent function variables
-   static int tick = 0; // artificial time
-   static int timestamps[MAXPROCESSES][MAXPROCPAGES]; 
+  static int tick = 0; // artificial time
+  static int timestamps[MAXPROCESSES][MAXPROCPAGES]; 
 
-   // these are regular dynamic variables on stack
-   int proc,pc,page,oldpage; 
+  // these are regular dynamic variables on stack
+  int proc,pc,page,oldpage; 
 
-   // select first active process 
-   for (proc = 0; proc < MAXPROCESSES; proc++) { 
-      if (q[proc].active) { 
-	 pc = q[proc].pc; 		// program counter for process
-         page = pc/PAGESIZE; 		// page the program counter needs
-	 timestamps[proc][page] = tick;	// last access
-         if (!q[proc].pages[page]) { 	// if page is not there: 
-	    if (!pagein(proc,page)) {   // try to swap in, if this fails: 
-	       // look at all old pages, swap out any other pages 
-	       for (oldpage = 0; oldpage<q[proc].npages; oldpage++) {
-		  // if I find a page that's not equal to the one I want, 
-	          // swap it out => 100 ticks later, pagein will succeed. 
-		  if (oldpage!=page && pageout(proc,oldpage)) break; 
-                  //                   ^^^^^^^^^^^^^^^^^^^^^ swapout starts
-                  //  ^^^^^^^^^^^^^ it's not the page I want
- 		} 
-	    } 
-	 }
-	 break; // no more 
-      } 
-   } 	
-   tick++; // advance time for next iteration
+  // select first active process 
+  for (proc = 0; proc < MAXPROCESSES; proc++) { 
+    if (q[proc].active) { 
+      pc = q[proc].pc; 		// program counter for process
+      page = pc/PAGESIZE; 		// page the program counter needs
+      timestamps[proc][page] = tick;	// last access
+      if (!q[proc].pages[page]) { 	// if page is not there: 
+        if (!pagein(proc,page)) {   // try to swap in, if this fails: 
+          // look at all old pages, swap out any other pages 
+          for (oldpage = 0; oldpage<q[proc].npages; oldpage++) {
+            // if I find a page that's not equal to the one I want, 
+            // swap it out => 100 ticks later, pagein will succeed. 
+            if (oldpage!=page && pageout(proc,oldpage)) break; 
+            //                   ^^^^^^^^^^^^^^^^^^^^^ swapout starts
+            //  ^^^^^^^^^^^^^ it's not the page I want
+          } 
+        } 
+      }
+      break; // no more 
+    } 
+  } 	
+  tick++; // advance time for next iteration
 } 
 #endif
 
