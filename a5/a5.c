@@ -11,10 +11,13 @@
 #include <stdio.h> 
 #include "t5.h"
 
+/** @def RDM
+ *  Use the random replacement algorithm.
+ */
 #define RDM (1 << 0)
-#define LRU (1 << 1)
-#define PRD (1 << 2)
-#define PSM (1 << 3)
+#define LRU (1 << 1) // @def LRU use the LRU replacement algorithm
+#define PRD (1 << 2) // @def PRD use a predictive replacement algorithm
+#define PSM (1 << 3) // @def PSM use a probabilistic state machine algorithm
 
 #define PAGER RDM
 
@@ -59,6 +62,25 @@ int used_pages(Pentry q[MAXPROCESSES]) {
     }
   }
   return total;
+}
+
+void initial_page(Pentry q[MAXPROCESSES]) {
+  int proc, pc, page;
+
+  for (proc = 0; proc < MAXPROCESSES / 2; proc++) {
+    if (!q[proc].active) {
+      proc--; 
+      printf ("inactive\n");
+      continue;
+    }
+
+    pc = q[proc].pc; 
+    page = pc / PAGESIZE;
+
+    pagein(proc, page);
+    pagein(proc, page + 1);
+
+  }
 }
 
 #if PAGER == RDM
