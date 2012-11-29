@@ -20,5 +20,13 @@ typedef struct pentry {
 } Pentry ; 
 
 int pageout(int process, int page); 
+
+/**
+ * Swap a page into memory.
+ *
+ * @param process the process whose page you're modifying
+ */
 int pagein (int process, int page); 
+
+
 void pageit(Pentry q[MAXPROCESSES]); 

@@ -8,7 +8,7 @@
  *
  * Assignment 5 --- Paging
  */
-#include <stdio.h> 
+#include <stdio.h>
 #include "t5.h"
 
 /** @def RDM
@@ -20,6 +20,12 @@
 #define PSM (1 << 3) // @def PSM use a probabilistic state machine algorithm
 
 #define PAGER LRU
+
+typedef struct _procpage {
+  int proc;
+  int page;
+  int time;
+} procpage;
 
 // proc: process to work upon (0-19) 
 // page: page to put in (0-19)
@@ -109,8 +115,8 @@ void pageit(Pentry q[MAXPROCESSES]) {
     initial_page(q);
     tick++;
     return;
+
   }
- 
 
   for (proc = 0; proc < MAXPROCESSES; proc++) { 
     if (q[proc].active) { 
@@ -141,6 +147,8 @@ void pageit(Pentry q[MAXPROCESSES]) {
  */
 void pageit(Pentry q[MAXPROCESSES]) { 
   static int timestamps[MAXPROCESSES][MAXPROCPAGES];
+  static int proc_time[MAXPROCESSES];
+
   int proc, pc, page, oldpage;
 
   // Initial page load
@@ -159,11 +167,20 @@ void pageit(Pentry q[MAXPROCESSES]) {
 
       if (!q[proc].pages[page]) {
         if (!pagein(proc,page)) {
-          for (oldpage = 0; oldpage<q[proc].npages; oldpage++) {
-            if (oldpage != page) {
-              pageout(proc, oldpage);
+          // Need to pageout an old page
+          procpage lru = {0, 0, 0};
+          for (int i = 0; i < MAXPROCESSES; ++i) {
+            for (int j = 0; j < MAXPROCPAGES; ++j) {
+              if (lru.time < timestamps[i][j] && q[i].pages[j]) {
+                lru.proc = i;
+                lru.page = j;
+                lru.time = timestamps[i][j];
+              }
             }
           }
+
+          pageout(lru.proc, lru.page);
+          break;
         }
       }
     } 
@@ -186,10 +203,10 @@ void pageit(Pentry q[MAXPROCESSES]) {
   // Print out ifo at end
   if (all_inactive(q)) {
     for (int i = 0; i < MAXPROCPAGES; ++i) {
-        for (int j = 0; j < MAXPROCPAGES; ++j) {
-          printf ("%6d ", timestamps[i][j]);
-        }
-        printf ("\n");
+      for (int j = 0; j < MAXPROCPAGES; ++j) {
+        printf ("%6d ", timestamps[i][j]);
+      }
+      printf ("\n");
     }
   }
 
