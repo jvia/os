@@ -22,7 +22,7 @@
 /** Use a probabilistic state machine algorithm. */
 #define PSM (1 << 3)
 /** The pager to use. */
-#define PAGER PRD
+#define PAGER PSM
 
 //////////////////////////////////////////////////////////////////////
 // Proto declarations
@@ -36,6 +36,7 @@ int free_pages(Pentry[]);
 void random_pager(Pentry[]);
 void predictive_pager(Pentry[]);
 void psm_pager(Pentry[]);
+int compdoubles(const void*, const void*);
 
 //////////////////////////////////////////////////////////////////////
 // Global variables
@@ -65,9 +66,33 @@ int jump[MAXPROCPAGES][MAXPROCPAGES] =
   {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
 };
 
+/** The jump probability table. */
+double prob_jump[20][20] = {
+  {0.092130, 0.000926, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000},
+  {0.000000, 0.091667, 0.000926, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000},
+  {0.000000, 0.000000, 0.091667, 0.000926, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000},
+  {0.000093, 0.000000, 0.000000, 0.091667, 0.000579, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000162, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000},
+  {0.000000, 0.000000, 0.000000, 0.000000, 0.073333, 0.000741, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000},
+  {0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.073333, 0.000741, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000},
+  {0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.073333, 0.000741, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000},
+  {0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.073333, 0.000741, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000},
+  {0.000046, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.073333, 0.000556, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000},
+  {0.000046, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.055000, 0.000394, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000},
+  {0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.055000, 0.000556, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000},
+  {0.000023, 0.000000, 0.000000, 0.000000, 0.000162, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.055000, 0.000370, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000},
+  {0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.036667, 0.000370, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000},
+  {0.000116, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.036667, 0.000185, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000},
+  {0.000139, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.018333, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000},
+  {0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000},
+  {0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000},
+  {0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000},
+  {0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000},
+  {0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000}
+};
 
 // Globals
 int tick = 0;
+int init = 0;
 
 /**
  * Deals with swapping pages in and out of memory.
@@ -79,9 +104,9 @@ int tick = 0;
 void pageit(Pentry q[MAXPROCESSES])
 {
   switch (PAGER) {
-  case RDM: return random_pager(q);
-  case PRD: return predictive_pager(q);
-  case PSM: return psm_pager(q);
+  case RDM: random_pager(q);     break;
+  case PRD: predictive_pager(q); break;
+  case PSM: psm_pager(q);        break;
   }
 }
 
@@ -96,9 +121,9 @@ void random_pager(Pentry q[MAXPROCESSES]) {
   static int last_pages[MAXPROCESSES];
   
   // page in two pages for 1/2 of processes
-  if (tick == 0) {
+  if (!init) {
     initial_page(q);
-    tick++;
+    init = 1;
     return;
   }
 
@@ -108,15 +133,10 @@ void random_pager(Pentry q[MAXPROCESSES]) {
       pc = q[proc].pc; 
       page = pc / PAGESIZE;
 
-      if (!q[proc].pages[page]) {
-        if (!pagein(proc,page)) {
-          for (oldpage = 0; oldpage<q[proc].npages; oldpage++) {
-            if (oldpage != page) {
-              pageout(proc, oldpage);
-            }
-          }
-        }
-      }
+      if (!q[proc].pages[page] && !pagein(proc,page))
+        for (oldpage = 0; oldpage<q[proc].npages; oldpage++) 
+          if (oldpage != page) 
+            pageout(proc, oldpage);
     } 
   }
 
@@ -130,10 +150,10 @@ void random_pager(Pentry q[MAXPROCESSES]) {
 
   // If done, let's print table
   if (all_inactive(q)) {
-    for (int i = 0; i < MAXPROCPAGES; ++i) {
-      for (int j = 0; j < MAXPROCPAGES; ++j) {
+    int i, j;
+    for (i = 0; i < MAXPROCPAGES; ++i) {
+      for (j = 0; j < MAXPROCPAGES; ++j) 
         printf("%d ", jump[i][j]);
-      }
       printf("\n");
     }
   }
@@ -170,43 +190,34 @@ void predictive_pager(Pentry q[MAXPROCESSES]) {
       // failure we head into the if-statement to remove unneeded
       // pages
       if (!q[proc].pages[page] && !pagein(proc,page)) {
-
         // Remove all low transition idle page
         if (idle_pages(q) && !free_pages(q)) {
           for (int i = 0; i < MAXPROCESSES; i++) {
             int curr_proc_page = q[i].pc / PAGESIZE;
-            for (int j = 0; j < MAXPROCPAGES; j++) {
-              if (q[i].pages[j] && j != curr_proc_page) { // idle page
-                if (!jump[curr_proc_page][j]) { // low transtion prob
+            // If idle page and won't jump to that page, page it out
+            for (int j = 0; j < MAXPROCPAGES; j++)
+              if (q[i].pages[j] && j != curr_proc_page && !jump[curr_proc_page][j])
                   pageout(i, j);
-                }
-              }
             }
           }
-        }        
       }
       // Page loaded succesfully; keep track in timestamps
       else {
         // Try to pagein all pages we can
         for (int p = 0; p < MAXPROCPAGES; p++)
-        {
-          if (jump[page][p]) {
-            //printf ("PROC %2d pagein attemp with page %2d\n", proc, p);
-            if (!pagein(proc, p)) break;
-          }
-        }
-
-        timestamps[proc][page] = tick;
+          if (jump[page][p] && !pagein(proc, p))
+            break;
       }
-    }
+    }    
     // If process is inactive, free all its pages
     else {
       for (page = 0; page < MAXPROCPAGES; page++) {
         pageout(proc, page);
       }
     }
-  }  
+  }
 }
+
 
 /**
  * Similar to the predictive pager, except that it prioritizes by
@@ -215,7 +226,8 @@ void predictive_pager(Pentry q[MAXPROCESSES]) {
  * @param q the process states
  */
 void psm_pager(Pentry q[MAXPROCESSES]) { 
-  int proc, pc, page, oldpage;
+  int proc, pc, page, oldpage, i, j;
+  double tmp[MAXPROCPAGES];
 
   // page in two pages for 1/2 of processes
   if (tick == 0) {
@@ -223,7 +235,7 @@ void psm_pager(Pentry q[MAXPROCESSES]) {
     initial_page(q);
     return;
   }
-
+  
   tick++;
   for (proc = 0; proc < MAXPROCESSES; proc++) { 
     if (q[proc].active) { 
@@ -235,42 +247,51 @@ void psm_pager(Pentry q[MAXPROCESSES]) {
       // failure we head into the if-statement to remove unneeded
       // pages
       if (!q[proc].pages[page] && !pagein(proc,page)) {
-
         // Remove all low transition idle page
         if (idle_pages(q) && !free_pages(q)) {
-          for (int i = 0; i < MAXPROCESSES; i++) {
+          for (i = 0; i < MAXPROCESSES; i++) {
             int curr_proc_page = q[i].pc / PAGESIZE;
-            for (int j = 0; j < MAXPROCPAGES; j++) {
-              if (q[i].pages[j] && j != curr_proc_page) { // idle page
-                if (!jump[curr_proc_page][j]) { // low transtion prob
+            for (j = 0; j < MAXPROCPAGES; j++)
+              // Idle page with no transition probability
+              if (q[i].pages[j] && j != curr_proc_page && !jump[curr_proc_page][j])
                   pageout(i, j);
-                }
-              }
-            }
           }
         }        
       }
       // Page loaded succesfully; keep track in timestamps
       else {
-        // Try to pagein all pages we can
-        for (int p = 0; p < MAXPROCPAGES; p++)
-        {
-          if (jump[page][p]) {
-            //printf ("PROC %2d pagein attemp with page %2d\n", proc, p);
-            if (!pagein(proc, p)) break;
-          }
-        }
-
-        timestamps[proc][page] = tick;
+        // Sort the pages by likelihood, paging in all that aren't 0
+        // as long as we can
+        for (i = 0; i < MAXPROCPAGES; i++)
+          tmp[i] = prob_jump[page][i];
+        qsort(tmp, MAXPROCPAGES, sizeof(double), compdoubles);
+        for (i = 0; i < MAXPROCPAGES; i++)
+          if (jump[page][i] && !pagein(proc, i))
+            break;
       }
     }
     // If process is inactive, free all its pages
     else {
-      for (page = 0; page < MAXPROCPAGES; page++) {
+      for (page = 0; page < MAXPROCPAGES; page++)
         pageout(proc, page);
-      }
     }
   }  
+}
+
+/**
+ * Compare to doubles such that they are in decreasing order.
+ *
+ * @param a pointer to a double
+ * @param b pointer to a double
+ */
+int compdoubles(const void *a, const void *b)
+{
+  const int *arg1 = a;
+  const int *arg2 = b;
+
+  if (*arg1 > *arg2) return  1;
+  if (*arg1 < *arg2) return -1;
+  return 0;
 }
 
 /**
@@ -280,11 +301,9 @@ void psm_pager(Pentry q[MAXPROCESSES]) {
  */
 int used_pages(Pentry q[MAXPROCESSES]) {
   int p, i, total = 0;
-  for (p = 0; p < MAXPROCESSES; p++) {
-    for (i = 0; i < MAXPROCESSES; i++) {
+  for (p = 0; p < MAXPROCESSES; p++)
+    for (i = 0; i < MAXPROCESSES; i++)
       total += q[p].pages[i];
-    }
-  }
   return total;
 }
 
@@ -305,9 +324,8 @@ int free_pages(Pentry q[MAXPROCESSES])
  */
 int all_inactive(Pentry q[MAXPROCESSES])
 {
-  for (int proc = 0; proc < MAXPROCESSES; proc++) {
+  for (int proc = 0; proc < MAXPROCESSES; proc++)
     if (q[proc].active) return 0;
-  }
   return 1;
 }
 
@@ -321,7 +339,7 @@ int all_inactive(Pentry q[MAXPROCESSES])
  */
 void initial_page(Pentry q[MAXPROCESSES]) {
   int proc, pc, page;
-  for (proc = 0; proc < 10 / 2; proc++) {
+  for (proc = 0; proc < 10; proc++) {
     // Unlikely to be true, but if so, we can pre-fetch for another
     // process
     if (!q[proc].active) {
@@ -334,8 +352,6 @@ void initial_page(Pentry q[MAXPROCESSES]) {
 
     pagein(proc, page);
     pagein(proc, page + 1);
-    timestamps[proc][page] = tick;
-    timestamps[proc][page + 1] = tick;
   }
 }
 
@@ -347,9 +363,8 @@ void initial_page(Pentry q[MAXPROCESSES]) {
 int pages_to_free(int from)
 {
   int total = 0;
-  for (int to = 0; to < MAXPROCPAGES; to++) {
+  for (int to = 0; to < MAXPROCPAGES; to++)
     total += jump[from][to];
-  }
 }
 
 /**
@@ -366,8 +381,8 @@ int pages_to_free(int from)
 int idle_pages(Pentry q[MAXPROCESSES])
 {
   int total = MAXPROCPAGES;
-  int curr_page;
-  for (int proc = 0; proc < MAXPROCESSES; proc++) {
+  int curr_page, proc;
+  for (proc = 0; proc < MAXPROCESSES; proc++) {
     curr_page = q[proc].pc / PAGESIZE;
     if (q[proc].pages[curr_page])
       total--;
