@@ -1,4 +1,5 @@
 /**
+
  * @file
  *
  * Implementation of a pager.
@@ -12,26 +13,34 @@
  */
 #include <stdio.h>
 #include <stdlib.h>
-
 #include "t5.h"
 
-/** @def RDM
- *  Use the random replacement algorithm.
- */
+/** Use the random replacement algorithm. */
 #define RDM (1 << 0)
-#define LRU (1 << 1) // @def LRU use the LRU replacement algorithm
-#define PRD (1 << 2) // @def PRD use a predictive replacement algorithm
-#define PSM (1 << 3) // @def PSM use a probabilistic state machine algorithm
+/** Use a predictive pager. */
+#define PRD (1 << 2)
+/** Use a probabilistic state machine algorithm. */
+#define PSM (1 << 3)
+/** The pager to use. */
+#define PAGER PRD
 
-#define PAGER PSM
+//////////////////////////////////////////////////////////////////////
+// Proto declarations
+int used_paged(Pentry[]);
+int all_inactive(Pentry[]);
+void initial_page(Pentry[]);
+int most_likely_transition(int,int);
+int pages_to_free(int);
+int idle_pages(Pentry[]);
+int free_pages(Pentry[]);
+void random_pager(Pentry[]);
+void predictive_pager(Pentry[]);
+void psm_pager(Pentry[]);
 
-typedef struct _procpage {
-  int proc;
-  int page;
-  int time;
-} procpage;
+//////////////////////////////////////////////////////////////////////
+// Global variables
 
-// A transition table for each process, from page to page.
+/** A transition table for each process, from page to page. */
 int jump[MAXPROCPAGES][MAXPROCPAGES] =
 {
   {1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
@@ -56,25 +65,33 @@ int jump[MAXPROCPAGES][MAXPROCPAGES] =
   {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
 };
 
-// Proto declarations
-int used_paged(Pentry[]);
-int all_inactive(Pentry[]);
-void initial_page(Pentry[]);
-int most_likely_transition(int,int);
-int pages_to_free(int); // given a page, return numebr of pages with transition
-int idle_pages(Pentry[]);
-int free_pages(Pentry[]);
 
 // Globals
 int tick = 0;
 
-#if PAGER == RDM
+/**
+ * Deals with swapping pages in and out of memory.
+ *
+ * Depending on the startegy used, this function behaves differently.
+ *
+ * @param q the process states
+ */
+void pageit(Pentry q[MAXPROCESSES])
+{
+  switch (PAGER) {
+  case RDM: return random_pager(q);
+  case PRD: return predictive_pager(q);
+  case PSM: return psm_pager(q);
+  }
+}
+
 /**
  * A pager which places a random page in memory.
  *
  * @param q the state of every process
  */
-void pageit(Pentry q[MAXPROCESSES]) { 
+void random_pager(Pentry q[MAXPROCESSES]) {
+
   int proc, pc, page, oldpage;
   static int last_pages[MAXPROCESSES];
   
@@ -114,131 +131,25 @@ void pageit(Pentry q[MAXPROCESSES]) {
   // If done, let's print table
   if (all_inactive(q)) {
     for (int i = 0; i < MAXPROCPAGES; ++i) {
-        for (int j = 0; j < MAXPROCPAGES; ++j) {
-            printf("%d ", jump[i][j]);
-        }
-        printf("\n");
-    }
-  }
-} 
-#elif PAGER == LRU
-/**
- * Least-Recently-Used: make a time variable, count ticks. Make an
- * array: what time each page was used for each process.
- *
- * @param q the process state
- */
-void pageit(Pentry q[MAXPROCESSES]) { 
-  
-  static int proc_time[MAXPROCESSES];
-
-  int proc, pc, page, oldpage;
-
-  // Initial page load
-  if (tick == 0) {
-    initial_page(q);
-    tick++;
-    return;
-  }
-
-
-  for (proc = 0; proc < MAXPROCESSES; proc++) { 
-    if (q[proc].active) { 
-
-      pc = q[proc].pc; 
-      page = pc / PAGESIZE;
-
-      if (!q[proc].pages[page]) {
-        if (!pagein(proc,page)) {
-          // Need to pageout an old page
-          procpage lru = {0, 0, 0};
-          for (int i = 0; i < MAXPROCESSES; ++i) {
-            for (int j = 0; j < MAXPROCPAGES; ++j) {
-              if (lru.time < timestamps[i][j] && q[i].pages[j]) {
-                lru.proc = i;
-                lru.page = j;
-                lru.time = timestamps[i][j];
-              }
-            }
-          }
-
-          pageout(lru.proc, lru.page);
-          //break;
-        }
-      }
-    } 
-  }
-
-  // Update page usage time by determing which page each process is
-  // currently using and resetting its value back to 0, while
-  // increasing each other page.
-  for (proc = 0; proc < MAXPROCESSES; proc++) {
-    int cur_page = q[proc].pc / PAGESIZE;
-    for (page = 0; page < MAXPROCPAGES; page++) {
-      if (page == cur_page)
-        timestamps[proc][page] = 0;
-      else
-        timestamps[proc][page]++;
-    }
-  }
-
-  
-  // Print out ifo at end
-  if (all_inactive(q)) {
-    for (int i = 0; i < MAXPROCPAGES; ++i) {
       for (int j = 0; j < MAXPROCPAGES; ++j) {
-        printf ("%6d ", timestamps[i][j]);
+        printf("%d ", jump[i][j]);
       }
-      printf ("\n");
+      printf("\n");
     }
   }
-
-  tick++;
-} 
-
-
-
-#elif PAGER == PRD
-// second strategy: predictive
-// track the PC for each process over time
-// e.g., in a ring buffer. 
-// int pc[PROCESSES][TIMES]; 
-// at any time pc[i][0]-pc[i][TIMES-1] are the last TIMES
-// locations of the pc. If these are near a page border (up 
-// or down, and if there is an idle page, swap it in. 
-void pageit(Pentry q[MAXPROCESSES]) { 
-  //////////////////////////////////////////////////////////////////////
-  // persistent function variables
-  static int tick = 0; // artificial time
-  static int timestamps[MAXPROCESSES][MAXPROCPAGES]; 
-
-  // these are regular dynamic variables on stack
-  int proc,pc,page,oldpage; 
-
-  // select first active process 
-  for (proc = 0; proc < MAXPROCESSES; proc++) { 
-    if (q[proc].active) { 
-      pc = q[proc].pc;
-      page = pc/PAGESIZE;
-      timestamps[proc][page] = tick;
-      if (!q[proc].pages[page]) {
-        if (!pagein(proc,page)) {
-          for (oldpage = 0; oldpage<q[proc].npages; oldpage++) {
-            if (oldpage!=page && pageout(proc,oldpage)) break; 
-          } 
-        } 
-      }
-      break; // no more 
-    } 
-  } 	
-  tick++; // advance time for next iteration
 }
 
-#elif PAGER == PSM
-// third strategy: probabilistic state machine
-// From each page, compute the pages that you can branch to. 
-// Swap them in according to their probability of occurrence. 
-void pageit(Pentry q[MAXPROCESSES]) { 
+/**
+ * Predictive pager pre-fetches pages it thinks will be needed next.
+ *
+ * It does this by examining a process current page and paging in as
+ * many pages it is likely to need. At all times it attempts to remove
+ * as many idle pages as possible, ensuring thatthese are not pages
+ * that are likely to be needed in the future.
+ * 
+ * @param q the process states
+ */
+void predictive_pager(Pentry q[MAXPROCESSES]) { 
   int proc, pc, page, oldpage;
 
   // page in two pages for 1/2 of processes
@@ -295,9 +206,78 @@ void pageit(Pentry q[MAXPROCESSES]) {
       }
     }
   }  
-} 
-#endif
+}
 
+/**
+ * Similar to the predictive pager, except that it prioritizes by
+ * transition probability.
+ *
+ * @param q the process states
+ */
+void psm_pager(Pentry q[MAXPROCESSES]) { 
+  int proc, pc, page, oldpage;
+
+  // page in two pages for 1/2 of processes
+  if (tick == 0) {
+    tick++;
+    initial_page(q);
+    return;
+  }
+
+  tick++;
+  for (proc = 0; proc < MAXPROCESSES; proc++) { 
+    if (q[proc].active) { 
+
+      pc = q[proc].pc; 
+      page = pc / PAGESIZE;
+
+      // If desired page is not in memory, try to page it in. On
+      // failure we head into the if-statement to remove unneeded
+      // pages
+      if (!q[proc].pages[page] && !pagein(proc,page)) {
+
+        // Remove all low transition idle page
+        if (idle_pages(q) && !free_pages(q)) {
+          for (int i = 0; i < MAXPROCESSES; i++) {
+            int curr_proc_page = q[i].pc / PAGESIZE;
+            for (int j = 0; j < MAXPROCPAGES; j++) {
+              if (q[i].pages[j] && j != curr_proc_page) { // idle page
+                if (!jump[curr_proc_page][j]) { // low transtion prob
+                  pageout(i, j);
+                }
+              }
+            }
+          }
+        }        
+      }
+      // Page loaded succesfully; keep track in timestamps
+      else {
+        // Try to pagein all pages we can
+        for (int p = 0; p < MAXPROCPAGES; p++)
+        {
+          if (jump[page][p]) {
+            //printf ("PROC %2d pagein attemp with page %2d\n", proc, p);
+            if (!pagein(proc, p)) break;
+          }
+        }
+
+        timestamps[proc][page] = tick;
+      }
+    }
+    // If process is inactive, free all its pages
+    else {
+      for (page = 0; page < MAXPROCPAGES; page++) {
+        pageout(proc, page);
+      }
+    }
+  }  
+}
+
+/**
+ * Determines the number of used pages.
+ *
+ * @param q the process states
+ */
 int used_pages(Pentry q[MAXPROCESSES]) {
   int p, i, total = 0;
   for (p = 0; p < MAXPROCESSES; p++) {
@@ -308,11 +288,21 @@ int used_pages(Pentry q[MAXPROCESSES]) {
   return total;
 }
 
+/**
+ * Determines if there are any free pages.
+ *
+ * @param q the process states
+ */
 int free_pages(Pentry q[MAXPROCESSES])
 {
   return !used_pages(q);
 }
 
+/**
+ * Determines if all processes are inactive.
+ *
+ * @param q the process states
+ */
 int all_inactive(Pentry q[MAXPROCESSES])
 {
   for (int proc = 0; proc < MAXPROCESSES; proc++) {
@@ -324,11 +314,16 @@ int all_inactive(Pentry q[MAXPROCESSES])
 /**
  * Initial page load.
  *
- * The goal is to get as many processes running as possible.
+ * The goal is to get as many processes running as possible. This
+ * function simply loads two pages for 10 processes.
+ *
+ * @param q the process states
  */
 void initial_page(Pentry q[MAXPROCESSES]) {
   int proc, pc, page;
-  for (proc = 0; proc < MAXPROCESSES; proc++) {
+  for (proc = 0; proc < 10 / 2; proc++) {
+    // Unlikely to be true, but if so, we can pre-fetch for another
+    // process
     if (!q[proc].active) {
       proc--;
       continue;
@@ -344,19 +339,16 @@ void initial_page(Pentry q[MAXPROCESSES]) {
   }
 }
 
-int most_likely_transition(int proc, int page)
-{
-  int max_prob, max_page;
-}
-
 /**
  * Calculate how many additional pages to free.
+ *
+ * @param from the page from which the pc may jump
  */
-int pages_to_free(int page)
+int pages_to_free(int from)
 {
   int total = 0;
-  for (int p = 0; p < MAXPROCPAGES; p++) {
-    total += jump[page][p];
+  for (int to = 0; to < MAXPROCPAGES; to++) {
+    total += jump[from][to];
   }
 }
 
@@ -368,6 +360,8 @@ int pages_to_free(int page)
  * out. This is calculated by walking over the proc/page listing and
  * counting how many pages are in memory but not the current location
  * of the pc.
+ *
+ * @param q the state of the processes
  */
 int idle_pages(Pentry q[MAXPROCESSES])
 {
@@ -380,3 +374,4 @@ int idle_pages(Pentry q[MAXPROCESSES])
   }
   return total;
 }
+
