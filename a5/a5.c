@@ -146,7 +146,7 @@ void pageit(Pentry q[MAXPROCESSES]) {
  * @param q the process state
  */
 void pageit(Pentry q[MAXPROCESSES]) { 
-  static int timestamps[MAXPROCESSES][MAXPROCPAGES];
+  
   static int proc_time[MAXPROCESSES];
 
   int proc, pc, page, oldpage;
@@ -180,7 +180,7 @@ void pageit(Pentry q[MAXPROCESSES]) {
           }
 
           pageout(lru.proc, lru.page);
-          break;
+          //break;
         }
       }
     } 

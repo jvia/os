@@ -12,6 +12,8 @@
 #define PHYSICALPAGES 40              /* number of available physical pages */ 
 #define MAXPC (MAXPROCPAGES*PAGESIZE) /* largest PC value */ 
 
+int timestamps[MAXPROCESSES][MAXPROCPAGES];
+
 typedef struct pentry { 
    long active; 
    long pc; 

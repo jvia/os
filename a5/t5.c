@@ -410,7 +410,8 @@ int pageout(int process, int page) {
 	return TRUE; /* on its way out */ 
     if (processes[process]->pages[page]>0) 
 	return FALSE; /* not available to swap out */ 
-sim_log(LOG_PAGE,"process=%2d page=%3d start pageout\n",process,page);
+    sim_log(LOG_PAGE,"process=%2d page=%3d start pageout (%d)\n", process, page,
+            timestamps[process][page]);
     if (pages) fprintf(pages,"%d,%d,%d,%d,%d,going\n",
 	sysclock,process,page,processes[process]->pid, processes[process]->kind); 
     processes[process]->pages[page]=-1; return TRUE;
@@ -431,7 +432,8 @@ int pagein(int process, int page) {
 	return FALSE; 
     if (processes[process]->pages[page]!=-PAGEWAIT ) 
 	return FALSE; /* not yet out */ 
-    sim_log(LOG_PAGE,"process=%2d page=%3d start pagein\n",process,page);
+    sim_log(LOG_PAGE,"process=%2d page=%3d start pagein (%d)\n",process,page,
+      timestamps[process][page]);
     if (pages) fprintf(pages,"%d,%d,%d,%d,%d,coming\n",
 	sysclock,process,page,processes[process]->pid, processes[process]->kind); 
     processes[process]->pages[page]=PAGEWAIT; pagesavail--; return TRUE; 
