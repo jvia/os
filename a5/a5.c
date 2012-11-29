@@ -1,6 +1,8 @@
 /**
  * @file
  *
+ * Implementation of the pager.
+ *
  * @author Jeremiah Via <jeremiah@cs.tufts.edu>
  * @version 2012-11-29
  *
@@ -9,6 +11,8 @@
  * Assignment 5 --- Paging
  */
 #include <stdio.h>
+#include <stdlib.h>
+
 #include "t5.h"
 
 /** @def RDM
@@ -19,7 +23,7 @@
 #define PRD (1 << 2) // @def PRD use a predictive replacement algorithm
 #define PSM (1 << 3) // @def PSM use a probabilistic state machine algorithm
 
-#define PAGER LRU
+#define PAGER PSM
 
 typedef struct _procpage {
   int proc;
@@ -27,79 +31,44 @@ typedef struct _procpage {
   int time;
 } procpage;
 
-// proc: process to work upon (0-19) 
-// page: page to put in (0-19)
-// returns
-//   1 if pagein started or already started
-//   0 if it can't start (e.g., swapping out) 
-// int pagein(int proc, int page); 
+// A transition table for each process, from page to page.
+int jumps[MAXPROCESSES][MAXPROCPAGES][MAXPROCPAGES];
 
-double st_probs[20][20] = {
-  {0.092130, 0.000926, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000},
-  {0.000000, 0.091667, 0.000926, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000},
-  {0.000000, 0.000000, 0.091667, 0.000926, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000},
-  {0.000093, 0.000000, 0.000000, 0.091667, 0.000579, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000162, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000},
-  {0.000000, 0.000000, 0.000000, 0.000000, 0.073333, 0.000741, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000},
-  {0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.073333, 0.000741, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000},
-  {0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.073333, 0.000741, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000},
-  {0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.073333, 0.000741, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000},
-  {0.000046, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.073333, 0.000556, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000},
-  {0.000046, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.055000, 0.000394, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000},
-  {0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.055000, 0.000556, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000},
-  {0.000023, 0.000000, 0.000000, 0.000000, 0.000162, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.055000, 0.000370, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000},
-  {0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.036667, 0.000370, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000},
-  {0.000116, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.036667, 0.000185, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000},
-  {0.000139, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.018333, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000},
-  {0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000},
-  {0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000},
-  {0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000},
-  {0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000},
-  {0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000}
+int jump[20][20] =
+{
+  {1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+  {0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+  {0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+  {1, 0, 0, 1, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+  {0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+  {0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+  {0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+  {0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+  {1, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+  {0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+  {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0},
+  {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0},
+  {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0},
+  {1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0},
+  {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0},
+  {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+  {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+  {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+  {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+  {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
 };
 
+// Proto declarations
+int used_paged(Pentry[]);
+int all_inactive(Pentry[]);
+void initial_page(Pentry[]);
+int most_likely_transition(int,int);
+int pages_to_free(int); // given a page, return numebr of pages with transition
+int idle_pages(Pentry[]);
+int free_pages(Pentry[]);
 
+// Globals
 int tick = 0;
-
-int used_pages(Pentry q[MAXPROCESSES]) {
-  int p, i, total = 0;
-  for (p = 0; p < MAXPROCESSES; p++) {
-    for (i = 0; i < MAXPROCESSES; i++) {
-      total += q[p].pages[i];
-    }
-  }
-  return total;
-}
-
-int all_inactive(Pentry q[MAXPROCESSES])
-{
-  for (int proc = 0; proc < MAXPROCESSES; proc++) {
-    if (q[proc].active) return 0;
-  }
-  return 1;
-}
-
-/**
- * Initial page load.
- *
- * The goal is to get as many processes running as possible.
- */
-void initial_page(Pentry q[MAXPROCESSES]) {
-  int proc, pc, page;
-
-  for (proc = 0; proc < MAXPROCESSES / 2; proc++) {
-    if (!q[proc].active) {
-      proc--; 
-      continue;
-    }
-
-    pc = q[proc].pc; 
-    page = pc / PAGESIZE;
-
-    pagein(proc, page);
-    pagein(proc, page + 1);
-
-  }
-}
 
 #if PAGER == RDM
 /**
@@ -109,7 +78,8 @@ void initial_page(Pentry q[MAXPROCESSES]) {
  */
 void pageit(Pentry q[MAXPROCESSES]) { 
   int proc, pc, page, oldpage;
-
+  static int last_pages[20];
+  
   // page in two pages for 1/2 of processes
   if (tick == 0) {
     initial_page(q);
@@ -132,11 +102,32 @@ void pageit(Pentry q[MAXPROCESSES]) {
             }
           }
         }
- 
       }
     } 
   }
+
+  // Computer transitions
+  for (proc = 0; proc < 20; proc++) {
+    int curr_page = q[proc].pc / PAGESIZE;
+    int prev_page = last_pages[proc];
+    jumps[0][prev_page][curr_page] = 1;
+    last_pages[proc] = curr_page;
+  }
   tick++;
+
+  // If done, let's print table
+  if (all_inactive(q)) {
+    for (int i = 0; i < 1; ++i) {
+      printf ("PROC %d\n", i);
+        for (int j = 0; j < 20; ++j) {
+          for (int k = 0; k < 20; ++k) {
+            printf("%d ", jumps[i][j][k]);
+          }
+          printf("\n");
+        }
+        printf ("------------------------------\n");
+    }
+  }
 } 
 #elif PAGER == LRU
 /**
@@ -256,36 +247,144 @@ void pageit(Pentry q[MAXPROCESSES]) {
 // From each page, compute the pages that you can branch to. 
 // Swap them in according to their probability of occurrence. 
 void pageit(Pentry q[MAXPROCESSES]) { 
-  //////////////////////////////////////////////////////////////////////
-  // persistent function variables
-  static int tick = 0; // artificial time
-  static int timestamps[MAXPROCESSES][MAXPROCPAGES]; 
+  int proc, pc, page, oldpage;
 
-  // these are regular dynamic variables on stack
-  int proc,pc,page,oldpage; 
+  // page in two pages for 1/2 of processes
+  if (tick == 0) {
+    tick++;
+    initial_page(q);
+    return;
+  }
 
-  // select first active process 
+  tick++;
   for (proc = 0; proc < MAXPROCESSES; proc++) { 
     if (q[proc].active) { 
-      pc = q[proc].pc; 		// program counter for process
-      page = pc/PAGESIZE; 		// page the program counter needs
-      timestamps[proc][page] = tick;	// last access
-      if (!q[proc].pages[page]) { 	// if page is not there: 
-        if (!pagein(proc,page)) {   // try to swap in, if this fails: 
-          // look at all old pages, swap out any other pages 
-          for (oldpage = 0; oldpage<q[proc].npages; oldpage++) {
-            // if I find a page that's not equal to the one I want, 
-            // swap it out => 100 ticks later, pagein will succeed. 
-            if (oldpage!=page && pageout(proc,oldpage)) break; 
-            //                   ^^^^^^^^^^^^^^^^^^^^^ swapout starts
-            //  ^^^^^^^^^^^^^ it's not the page I want
-          } 
-        } 
+
+      pc = q[proc].pc; 
+      page = pc / PAGESIZE;
+
+      // If desired page is not in memory, try to page it in. On
+      // failure we head into the if-statement to remove unneeded
+      // pages
+      if (!q[proc].pages[page] && !pagein(proc,page)) {
+
+        // Remove all low transition idle page
+        if (idle_pages(q) && !free_pages(q)) {
+          for (int i = 0; i < 20; i++) {
+            int curr_proc_page = q[i].pc / PAGESIZE;
+            for (int j = 0; j < 20; j++) {
+              if (q[i].pages[j] && j != curr_proc_page) { // idle page
+                if (!jump[curr_proc_page][j]) { // low transtion prob
+                  pageout(i, j);
+                }
+              }
+            }
+          }
+        }        
       }
-      break; // no more 
-    } 
-  } 	
-  tick++; // advance time for next iteration
+      // Page loaded succesfully; keep track in timestamps
+      else {
+        // Try to pagein all pages we can
+        for (int p = 0; p < 20; p++)
+        {
+          if (jump[page][p]) {
+            //printf ("PROC %2d pagein attemp with page %2d\n", proc, p);
+            if (!pagein(proc, p)) break;
+          }
+        }
+
+        timestamps[proc][page] = tick;
+      }
+    }
+    // If process is inactive, free all its pages
+    else {
+      for (page = 0; page < MAXPROCPAGES; page++) {
+        pageout(proc, page);
+      }
+    }
+  }  
 } 
 #endif
 
+int used_pages(Pentry q[MAXPROCESSES]) {
+  int p, i, total = 0;
+  for (p = 0; p < MAXPROCESSES; p++) {
+    for (i = 0; i < MAXPROCESSES; i++) {
+      total += q[p].pages[i];
+    }
+  }
+  return total;
+}
+
+int free_pages(Pentry q[MAXPROCESSES])
+{
+  return !used_pages(q);
+}
+
+int all_inactive(Pentry q[MAXPROCESSES])
+{
+  for (int proc = 0; proc < MAXPROCESSES; proc++) {
+    if (q[proc].active) return 0;
+  }
+  return 1;
+}
+
+/**
+ * Initial page load.
+ *
+ * The goal is to get as many processes running as possible.
+ */
+void initial_page(Pentry q[MAXPROCESSES]) {
+  int proc, pc, page;
+  for (proc = 0; proc < MAXPROCESSES / 2; proc++) {
+    if (!q[proc].active) {
+      proc--;
+      continue;
+    }
+
+    pc = q[proc].pc;
+    page = pc / PAGESIZE;
+
+    pagein(proc, page);
+    pagein(proc, page + 1);
+    timestamps[proc][page] = tick;
+    timestamps[proc][page + 1] = tick;
+  }
+}
+
+int most_likely_transition(int proc, int page)
+{
+  int max_prob, max_page;
+}
+
+/**
+ * Calculate how many additional pages to free.
+ */
+int pages_to_free(int page)
+{
+  int total = 0;
+  for (int p = 0; p < 20; p++) {
+    total += jump[page][p];
+  }
+}
+
+/**
+ * Calculate the number of idle pages.
+ *
+ * An idle page is one that is in memory but which is not being used
+ * by any process. These pages are candidates for being paged
+ * out. This is calculated by walking over the proc/page listing and
+ * counting how many pages are in memory but not the current location
+ * of the pc.
+ */
+int idle_pages(Pentry q[MAXPROCESSES])
+{
+  int total = 20;
+  int curr_page;
+  for (int proc = 0; proc < MAXPROCESSES; proc++) {
+    curr_page = q[proc].pc / PAGESIZE;
+    if (q[proc].pages[curr_page])
+      total--;
+  }
+  return total;
+}
