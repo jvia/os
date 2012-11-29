@@ -1,5 +1,4 @@
 /**
-
  * @file
  *
  * Implementation of a pager.
@@ -22,7 +21,7 @@
 /** Use a probabilistic state machine algorithm. */
 #define PSM (1 << 3)
 /** The pager to use. */
-#define PAGER PSM
+#define PAGER PRD
 
 //////////////////////////////////////////////////////////////////////
 // Proto declarations
@@ -192,10 +191,11 @@ void predictive_pager(Pentry q[MAXPROCESSES]) {
       if (!q[proc].pages[page] && !pagein(proc,page)) {
         // Remove all low transition idle page
         if (idle_pages(q) && !free_pages(q)) {
-          for (int i = 0; i < MAXPROCESSES; i++) {
+          int i,j;
+          for (i = 0; i < MAXPROCESSES; i++) {
             int curr_proc_page = q[i].pc / PAGESIZE;
             // If idle page and won't jump to that page, page it out
-            for (int j = 0; j < MAXPROCPAGES; j++)
+            for (j = 0; j < MAXPROCPAGES; j++)
               if (q[i].pages[j] && j != curr_proc_page && !jump[curr_proc_page][j])
                   pageout(i, j);
             }
@@ -204,7 +204,8 @@ void predictive_pager(Pentry q[MAXPROCESSES]) {
       // Page loaded succesfully; keep track in timestamps
       else {
         // Try to pagein all pages we can
-        for (int p = 0; p < MAXPROCPAGES; p++)
+        int p;
+        for (p = 0; p < MAXPROCPAGES; p++)
           if (jump[page][p] && !pagein(proc, p))
             break;
       }
@@ -324,7 +325,8 @@ int free_pages(Pentry q[MAXPROCESSES])
  */
 int all_inactive(Pentry q[MAXPROCESSES])
 {
-  for (int proc = 0; proc < MAXPROCESSES; proc++)
+  int proc;
+  for (proc = 0; proc < MAXPROCESSES; proc++)
     if (q[proc].active) return 0;
   return 1;
 }
@@ -362,8 +364,8 @@ void initial_page(Pentry q[MAXPROCESSES]) {
  */
 int pages_to_free(int from)
 {
-  int total = 0;
-  for (int to = 0; to < MAXPROCPAGES; to++)
+  int total = 0, to;
+  for (to = 0; to < MAXPROCPAGES; to++)
     total += jump[from][to];
 }
 

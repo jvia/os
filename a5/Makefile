@@ -1,4 +1,4 @@
-CFLAGS = -pedantic -std=gnu99 -ggdb
+CFLAGS = -pedantic -ggdb
 CC = gcc $(CFLAGS)
 
 all: see.R t5
