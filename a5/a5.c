@@ -1,7 +1,7 @@
 /**
  * @file
  *
- * Implementation of the pager.
+ * Implementation of a pager.
  *
  * @author Jeremiah Via <jeremiah@cs.tufts.edu>
  * @version 2012-11-29
@@ -32,9 +32,7 @@ typedef struct _procpage {
 } procpage;
 
 // A transition table for each process, from page to page.
-int jumps[MAXPROCESSES][MAXPROCPAGES][MAXPROCPAGES];
-
-int jump[20][20] =
+int jump[MAXPROCPAGES][MAXPROCPAGES] =
 {
   {1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
   {0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
@@ -78,14 +76,13 @@ int tick = 0;
  */
 void pageit(Pentry q[MAXPROCESSES]) { 
   int proc, pc, page, oldpage;
-  static int last_pages[20];
+  static int last_pages[MAXPROCESSES];
   
   // page in two pages for 1/2 of processes
   if (tick == 0) {
     initial_page(q);
     tick++;
     return;
-
   }
 
   for (proc = 0; proc < MAXPROCESSES; proc++) { 
@@ -107,25 +104,20 @@ void pageit(Pentry q[MAXPROCESSES]) {
   }
 
   // Computer transitions
-  for (proc = 0; proc < 20; proc++) {
+  for (proc = 0; proc < MAXPROCESSES; proc++) {
     int curr_page = q[proc].pc / PAGESIZE;
     int prev_page = last_pages[proc];
-    jumps[0][prev_page][curr_page] = 1;
+    jump[prev_page][curr_page] = 1;
     last_pages[proc] = curr_page;
   }
-  tick++;
 
   // If done, let's print table
   if (all_inactive(q)) {
-    for (int i = 0; i < 1; ++i) {
-      printf ("PROC %d\n", i);
-        for (int j = 0; j < 20; ++j) {
-          for (int k = 0; k < 20; ++k) {
-            printf("%d ", jumps[i][j][k]);
-          }
-          printf("\n");
+    for (int i = 0; i < MAXPROCPAGES; ++i) {
+        for (int j = 0; j < MAXPROCPAGES; ++j) {
+            printf("%d ", jump[i][j]);
         }
-        printf ("------------------------------\n");
+        printf("\n");
     }
   }
 } 
@@ -270,9 +262,9 @@ void pageit(Pentry q[MAXPROCESSES]) {
 
         // Remove all low transition idle page
         if (idle_pages(q) && !free_pages(q)) {
-          for (int i = 0; i < 20; i++) {
+          for (int i = 0; i < MAXPROCESSES; i++) {
             int curr_proc_page = q[i].pc / PAGESIZE;
-            for (int j = 0; j < 20; j++) {
+            for (int j = 0; j < MAXPROCPAGES; j++) {
               if (q[i].pages[j] && j != curr_proc_page) { // idle page
                 if (!jump[curr_proc_page][j]) { // low transtion prob
                   pageout(i, j);
@@ -285,7 +277,7 @@ void pageit(Pentry q[MAXPROCESSES]) {
       // Page loaded succesfully; keep track in timestamps
       else {
         // Try to pagein all pages we can
-        for (int p = 0; p < 20; p++)
+        for (int p = 0; p < MAXPROCPAGES; p++)
         {
           if (jump[page][p]) {
             //printf ("PROC %2d pagein attemp with page %2d\n", proc, p);
@@ -336,7 +328,7 @@ int all_inactive(Pentry q[MAXPROCESSES])
  */
 void initial_page(Pentry q[MAXPROCESSES]) {
   int proc, pc, page;
-  for (proc = 0; proc < MAXPROCESSES / 2; proc++) {
+  for (proc = 0; proc < MAXPROCESSES; proc++) {
     if (!q[proc].active) {
       proc--;
       continue;
@@ -363,7 +355,7 @@ int most_likely_transition(int proc, int page)
 int pages_to_free(int page)
 {
   int total = 0;
-  for (int p = 0; p < 20; p++) {
+  for (int p = 0; p < MAXPROCPAGES; p++) {
     total += jump[page][p];
   }
 }
@@ -379,7 +371,7 @@ int pages_to_free(int page)
  */
 int idle_pages(Pentry q[MAXPROCESSES])
 {
-  int total = 20;
+  int total = MAXPROCPAGES;
   int curr_page;
   for (int proc = 0; proc < MAXPROCESSES; proc++) {
     curr_page = q[proc].pc / PAGESIZE;
