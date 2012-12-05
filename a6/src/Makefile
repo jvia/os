@@ -1,5 +1,5 @@
 a6: a6.o
-	$(CC) a6.o -o a6
+	$(CC) a6.o -o a6 -lm
 
 
 a6.o: a6.c

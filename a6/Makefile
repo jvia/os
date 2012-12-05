@@ -21,3 +21,6 @@ clean-docs:
 
 clean: clean-docs
 	make -C src clean
+
+run: a6
+	./src/a6 tesfile.dat

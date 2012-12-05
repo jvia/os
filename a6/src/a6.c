@@ -5,15 +5,32 @@
  * @author Jeremiah Via <jeremiah@cs.tufts.edu>
  * @version 2012-12-10
  */
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <sys/file.h>
+#include <sys/time.h>
+#include <sys/types.h>
+#include <sys/uio.h>
+#include <unistd.h>
+
+#define PAGE_SIZE  8096
+#define WRITE_SIZE PAGE_SIZE*100
+#define BUFFER_SIZE PAGE_SIZE
+
+#define TIMES 100
 
 typedef struct _res {
   double time;
   double stddev;
 } result;
 
+//////////////////////////////////////////////////////////////////////
+// Proto Declarations
+double avg(double*,int);
+
 FILE *file;
+char *buffer;
 
 /**
  * Benchmark the disk read operation, no cache.
@@ -22,7 +39,21 @@ FILE *file;
  */
 result benchmark_disk_read(void)
 {
-  result res;
+  result res = {0.0, 0.0} ;
+  int fd;
+  struct timeval start, end;
+  
+  fd = open("testfile.dat", O_RDONLY, 0);
+  buffer = malloc(BUFFER_SIZE*sizeof(char));
+  
+  gettimeofday(&start, NULL);
+  read(fd, &buffer, BUFFER_SIZE);
+  gettimeofday(&end, NULL);
+  free(buffer);
+
+  res.time = ((double) end.tv_sec - start.tv_sec) + ((double) (end.tv_usec - start.tv_usec) / 1000.);
+  
+  close(fd);
   return res;
 }
 
@@ -33,7 +64,19 @@ result benchmark_disk_read(void)
  */
 result benchmark_disk_write(void)
 {
-  result res;
+  result res = {0.0, 0.0};
+  int fd = open("testfile.dat", O_WRONLY, 0);
+  int i;
+  for (i = 0; i < BUFFER_SIZE; ++i) {
+    buffer[i] = 'a';
+  }
+
+  struct timeval start, end;
+  gettimeofday(&start, NULL);
+  write(fd, &buffer, BUFFER_SIZE);
+  gettimeofday(&end, NULL);
+  res.time = ((double) end.tv_sec - start.tv_sec) + ((double) (end.tv_usec - start.tv_usec) / 1000.);
+  close(fd);
   return res;
 }
 
@@ -44,7 +87,20 @@ result benchmark_disk_write(void)
  */
 result benchmark_cache_read(void)
 {
-  result res;
+  result res = {0.0, 0.0};
+  int fd;
+  struct timeval start, end;
+  double time[TIMES];
+  
+  fd = open("testfile.dat", O_RDONLY, 0);
+  buffer = malloc(BUFFER_SIZE*sizeof(char));
+  read(fd, &buffer, BUFFER_SIZE);
+  gettimeofday(&start, NULL);
+  read(fd, &buffer, BUFFER_SIZE);
+  gettimeofday(&end, NULL);
+  free(buffer);
+  res.time = ((double) end.tv_sec - start.tv_sec) + ((double) (end.tv_usec - start.tv_usec) / 1000.);
+  close(fd);
   return res;
 }
 
@@ -55,8 +111,24 @@ result benchmark_cache_read(void)
  */
 result benchmark_cache_write(void)
 {
-  result res;
+  result res ={0., 0.};
   return res;
+}
+
+/**
+ * Randomly read/write to play around with the cache and prime it for
+ * another benchmark.
+ */
+void play_with_cache(void)
+{
+  /* int fd = open("testfile.dat", O_RDONLY, 0); */
+  /* buffer = malloc(BUFFER_SIZE * sizeof(char)); */
+
+  /* int i; */
+  /* for (i = 0; i < 10; ++i) { */
+    
+  /*   lseek(fd,  */
+  /* } */
 }
 
 int main(int argc, char **argv)
@@ -79,3 +151,4 @@ int main(int argc, char **argv)
   
   exit(0);
 }
+
