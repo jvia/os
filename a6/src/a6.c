@@ -10,6 +10,7 @@
 #include <stdlib.h>
 #include <sys/file.h>
 #include <sys/time.h>
+#include <time.h>
 #include <sys/types.h>
 #include <sys/uio.h>
 #include <unistd.h>
@@ -21,8 +22,8 @@
 #define TIMES 100
 
 typedef struct _res {
-  double time;
-  double stddev;
+  long time;
+  long stddev;
 } result;
 
 //////////////////////////////////////////////////////////////////////
@@ -32,6 +33,11 @@ double avg(double*,int);
 FILE *file;
 char *buffer;
 
+double to_secs(struct timeval start, struct timeval end) {
+  return ((double) end.tv_sec - start.tv_sec)
+    +    ((double) (end.tv_usec - start.tv_usec) / 1000.);
+}
+
 /**
  * Benchmark the disk read operation, no cache.
  *
@@ -39,21 +45,27 @@ char *buffer;
  */
 result benchmark_disk_read(const char *path)
 {
-  result res = {0.0, 0.0} ;
+  result res = {0, 0} ;
   int fd;
-  struct timeval start, end;
-  
+  struct timespec start, end;
+  double times[TIMES];
+
+  // prepare
   fd = open(path, O_RDONLY, 0);
   buffer = malloc(BUFFER_SIZE*sizeof(char));
-  
-  gettimeofday(&start, NULL);
-  read(fd, &buffer, BUFFER_SIZE);
-  gettimeofday(&end, NULL);
-  free(buffer);
 
-  res.time = ((double) end.tv_sec - start.tv_sec) + ((double) (end.tv_usec - start.tv_usec) / 1000.);
-  
+  // run
+  int i;
+  clock_gettime(CLOCK_REALTIME, &start);
+  read(fd, &buffer, BUFFER_SIZE);
+  clock_gettime(CLOCK_REALTIME, &end);
+    
+  // clean up
+  free(buffer);
   close(fd);
+
+  // calculate
+  res.time = end.tv_nsec - start.tv_nsec;
   return res;
 }
 
@@ -64,18 +76,18 @@ result benchmark_disk_read(const char *path)
  */
 result benchmark_disk_write(const char *path)
 {
-  result res = {0.0, 0.0};
+  result res = {0, 0};
   int fd = open(path, O_WRONLY, 0);
   int i;
   for (i = 0; i < BUFFER_SIZE; ++i) {
     buffer[i] = 'a';
   }
 
-  struct timeval start, end;
-  gettimeofday(&start, NULL);
+  struct timespec start, end;
+  clock_gettime(CLOCK_REALTIME, &start);
   write(fd, &buffer, BUFFER_SIZE);
-  gettimeofday(&end, NULL);
-  res.time = ((double) end.tv_sec - start.tv_sec) + ((double) (end.tv_usec - start.tv_usec) / 1000.);
+  clock_gettime(CLOCK_REALTIME, &end);
+  res.time = end.tv_nsec - start.tv_nsec;
   close(fd);
   return res;
 }
@@ -87,19 +99,19 @@ result benchmark_disk_write(const char *path)
  */
 result benchmark_cache_read(const char *path)
 {
-  result res = {0.0, 0.0};
+  result res = {0, 0};
   int fd;
-  struct timeval start, end;
+  struct timespec start, end;
   double time[TIMES];
   
   fd = open(path, O_RDONLY, 0);
   buffer = malloc(BUFFER_SIZE*sizeof(char));
   read(fd, &buffer, BUFFER_SIZE);
-  gettimeofday(&start, NULL);
+  clock_gettime(CLOCK_REALTIME, &start);
   read(fd, &buffer, BUFFER_SIZE);
-  gettimeofday(&end, NULL);
+  clock_gettime(CLOCK_REALTIME, &end);
   free(buffer);
-  res.time = ((double) end.tv_sec - start.tv_sec) + ((double) (end.tv_usec - start.tv_usec) / 1000.);
+  res.time = end.tv_nsec - start.tv_nsec;
   close(fd);
   return res;
 }
@@ -111,18 +123,19 @@ result benchmark_cache_read(const char *path)
  */
 result benchmark_cache_write(const char *path)
 {
-  result res = {0.0, 0.0};
+  result res = {0, 0};
   int fd = open(path, O_WRONLY, 0);
   int i;
   for (i = 0; i < BUFFER_SIZE; ++i) {
     buffer[i] = 'a';
   }
 
-  struct timeval start, end;
-  gettimeofday(&start, NULL);
+  struct timespec start, end;
+  clock_gettime(CLOCK_REALTIME, &start);
   write(fd, &buffer, BUFFER_SIZE);
-  gettimeofday(&end, NULL);
-  res.time = ((double) end.tv_sec - start.tv_sec) + ((double) (end.tv_usec - start.tv_usec) / 1000.);
+  clock_gettime(CLOCK_REALTIME, &end);
+  res.time = end.tv_nsec - start.tv_nsec;
+    //((double) end.tv_sec - start.tv_sec) + ((double) (end.tv_nsec - start.tv_nsec) / 1000000000.);
   close(fd);
   return res;
 }
@@ -156,10 +169,10 @@ int main(int argc, char **argv)
   result cache_read  = benchmark_cache_read(argv[1]);
   result cache_write = benchmark_cache_write(argv[1]);
   
-  printf ("Disk Read  \n  Average: %f\n  Stddev:  %f\n", disk_read.time,   disk_read.stddev);
-  printf ("Disk Write \n  Average: %f\n  Stddev:  %f\n", disk_write.time,  disk_write.stddev);
-  printf ("Cache Read \n  Average: %f\n  Stddev:  %f\n", cache_read.time,  cache_read.stddev);
-  printf ("Cache Write\n  Average: %f\n  Stddev:  %f\n", cache_write.time, cache_write.stddev);
+  printf ("Disk Read  \n  Average: %ld ns\n  Stddev:  %ld ns\n", disk_read.time,   disk_read.stddev);
+  printf ("Disk Write \n  Average: %ld ns\n  Stddev:  %ld ns\n", disk_write.time,  disk_write.stddev);
+  printf ("Cache Read \n  Average: %ld ns\n  Stddev:  %ld ns\n", cache_read.time,  cache_read.stddev);
+  printf ("Cache Write\n  Average: %ld ns\n  Stddev:  %ld ns\n", cache_write.time, cache_write.stddev);
   
   exit(0);
 }
