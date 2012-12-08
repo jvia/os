@@ -37,13 +37,13 @@ char *buffer;
  *
  * @return return the result of the benchmark.
  */
-result benchmark_disk_read(void)
+result benchmark_disk_read(const char *path)
 {
   result res = {0.0, 0.0} ;
   int fd;
   struct timeval start, end;
   
-  fd = open("testfile.dat", O_RDONLY, 0);
+  fd = open(path, O_RDONLY, 0);
   buffer = malloc(BUFFER_SIZE*sizeof(char));
   
   gettimeofday(&start, NULL);
@@ -62,10 +62,10 @@ result benchmark_disk_read(void)
  * 
  * @return return the result of the benchmark.
  */
-result benchmark_disk_write(void)
+result benchmark_disk_write(const char *path)
 {
   result res = {0.0, 0.0};
-  int fd = open("testfile.dat", O_WRONLY, 0);
+  int fd = open(path, O_WRONLY, 0);
   int i;
   for (i = 0; i < BUFFER_SIZE; ++i) {
     buffer[i] = 'a';
@@ -85,14 +85,14 @@ result benchmark_disk_write(void)
  *
  * @return return the result of the benchmark.
  */
-result benchmark_cache_read(void)
+result benchmark_cache_read(const char *path)
 {
   result res = {0.0, 0.0};
   int fd;
   struct timeval start, end;
   double time[TIMES];
   
-  fd = open("testfile.dat", O_RDONLY, 0);
+  fd = open(path, O_RDONLY, 0);
   buffer = malloc(BUFFER_SIZE*sizeof(char));
   read(fd, &buffer, BUFFER_SIZE);
   gettimeofday(&start, NULL);
@@ -109,9 +109,21 @@ result benchmark_cache_read(void)
  * 
  * @return return the result of the benchmark.
  */
-result benchmark_cache_write(void)
+result benchmark_cache_write(const char *path)
 {
-  result res ={0., 0.};
+  result res = {0.0, 0.0};
+  int fd = open(path, O_WRONLY, 0);
+  int i;
+  for (i = 0; i < BUFFER_SIZE; ++i) {
+    buffer[i] = 'a';
+  }
+
+  struct timeval start, end;
+  gettimeofday(&start, NULL);
+  write(fd, &buffer, BUFFER_SIZE);
+  gettimeofday(&end, NULL);
+  res.time = ((double) end.tv_sec - start.tv_sec) + ((double) (end.tv_usec - start.tv_usec) / 1000.);
+  close(fd);
   return res;
 }
 
@@ -139,14 +151,14 @@ int main(int argc, char **argv)
     exit(1);
   }
   
-  result disk_read   = benchmark_disk_read();
-  result disk_write  = benchmark_disk_write();
-  result cache_read  = benchmark_cache_read();
-  result cache_write = benchmark_cache_write();
+  result disk_read   = benchmark_disk_read(argv[1]);
+  result disk_write  = benchmark_disk_write(argv[1]);
+  result cache_read  = benchmark_cache_read(argv[1]);
+  result cache_write = benchmark_cache_write(argv[1]);
   
-  printf ("Disk Read\n  Average: %f\n  Stddev:  %f\n",   disk_read.time,   disk_read.stddev);
-  printf ("Disk Write\n  Average: %f\n  Stddev:  %f\n",  disk_write.time,  disk_write.stddev);
-  printf ("Cache Read\n  Average: %f\n  Stddev:  %f\n",  cache_read.time,  cache_read.stddev);
+  printf ("Disk Read  \n  Average: %f\n  Stddev:  %f\n", disk_read.time,   disk_read.stddev);
+  printf ("Disk Write \n  Average: %f\n  Stddev:  %f\n", disk_write.time,  disk_write.stddev);
+  printf ("Cache Read \n  Average: %f\n  Stddev:  %f\n", cache_read.time,  cache_read.stddev);
   printf ("Cache Write\n  Average: %f\n  Stddev:  %f\n", cache_write.time, cache_write.stddev);
   
   exit(0);
