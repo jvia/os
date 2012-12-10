@@ -1,5 +1,8 @@
+CFLAGS = -pedantic -ggdb -Wall -Werror
+CC = gcc $(CFLAGS)
+
 a6: a6.o
-	$(CC) a6.o -o a6 -lm -lrt
+	$(CC) a6.o -o a6 -lrt
 
 
 a6.o: a6.c
