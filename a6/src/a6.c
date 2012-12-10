@@ -26,6 +26,8 @@ long benchmark_disk_read(const char *path)
   int fd = open(path, O_RDONLY, 0);
   char buffer[BUFFER_SIZE];
 
+  sync();
+  
   clock_gettime(CLOCK_REALTIME, &start);
   read(fd, &buffer, BUFFER_SIZE);
   clock_gettime(CLOCK_REALTIME, &end);
@@ -56,6 +58,8 @@ long benchmark_disk_write(const char *path)
   for (i = 0; i < BUFFER_SIZE; ++i) {
     buffer[i] = 'a';
   }
+  
+  sync();
 
   /* run becnhmark */
   clock_gettime(CLOCK_REALTIME, &start);
@@ -79,9 +83,11 @@ long benchmark_cache_read(const char *path)
   /* prepare */
   int fd = open(path, O_RDONLY, 0);
   char buffer[BUFFER_SIZE];
-  read(fd, &buffer, BUFFER_SIZE);
+
+  sync();
   
   /* run becnhmark */
+  read(fd, &buffer, BUFFER_SIZE);
   clock_gettime(CLOCK_REALTIME, &start);
   read(fd, &buffer, BUFFER_SIZE);
   clock_gettime(CLOCK_REALTIME, &end);
@@ -103,13 +109,15 @@ long benchmark_cache_write(const char *path)
   /* prepare */
   int fd = open(path, O_WRONLY, 0);
   char buffer[BUFFER_SIZE];
-
+  
   /* populate buffer for writing */
   int i;
   for (i = 0; i < BUFFER_SIZE; ++i) {
     buffer[i] = 'a';
   }
 
+  sync();
+  
   /* run becnhmark */
   clock_gettime(CLOCK_REALTIME, &start);
   write(fd, &buffer, BUFFER_SIZE);
@@ -140,10 +148,10 @@ int main(int argc, char **argv)
   cache_read  = benchmark_cache_read(argv[1]);
   cache_write = benchmark_cache_write(argv[1]);
   
-  printf ("Disk Read:   %5ld ns\n", disk_read);
-  printf ("Disk Write:  %5ld ns (untrustworthy)\n", disk_write);
-  printf ("Cache Read:  %5ld ns\n", cache_read);
-  printf ("Cache Write: %5ld ns\n", cache_write);
+  printf ("Disk Read:   %7ld ns\n", disk_read);
+  printf ("Disk Write:  %7ld ns (untrustworthy)\n", disk_write);
+  printf ("Cache Read:  %7ld ns\n", cache_read);
+  printf ("Cache Write: %7ld ns\n", cache_write);
   
   exit(0);
 }
